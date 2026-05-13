@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Test BLE</title>
+<style>
+  body { font-family: -apple-system, sans-serif; padding: 20px; background: #111; color: #eee; }
+  button { font-size: 18px; padding: 16px 24px; margin: 10px 0; width: 100%; border-radius: 8px; border: none; background: #4f8cff; color: white; }
+  pre { background: #222; padding: 12px; border-radius: 8px; font-size: 12px; white-space: pre-wrap; word-break: break-all; }
+</style>
+</head>
+<body>
+  <h1>Test diagnostic</h1>
+  <p>Tape les boutons dans l'ordre et regarde les résultats.</p>
+
+  <button onclick="test1()">1. Test JavaScript</button>
+  <button onclick="test2()">2. Test Web Bluetooth API</button>
+  <button onclick="test3()">3. Test connexion BLE</button>
+
+  <pre id="out">Aucun test lancé.</pre>
+
+<script>
+  const out = document.getElementById('out');
+  function log(msg) {
+    out.textContent += '\n' + msg;
+    console.log(msg);
+  }
+  function clear() { out.textContent = ''; }
+
+  function test1() {
+    clear();
+    log('✓ JavaScript fonctionne !');
+    log('User-Agent : ' + navigator.userAgent);
+    log('Page sécurisée (HTTPS) : ' + (window.isSecureContext ? 'OUI' : 'NON ❌'));
+  }
+
+  function test2() {
+    clear();
+    log('navigator.bluetooth présent : ' + (navigator.bluetooth ? 'OUI ✓' : 'NON ❌'));
+    if (navigator.bluetooth) {
+      log('Type : ' + typeof navigator.bluetooth);
+      log('requestDevice présent : ' + (typeof navigator.bluetooth.requestDevice === 'function' ? 'OUI ✓' : 'NON ❌'));
+    }
+  }
+
+  async function test3() {
+    clear();
+    if (!navigator.bluetooth) {
+      log('❌ Web Bluetooth indisponible. Es-tu bien dans Bluefy ?');
+      return;
+    }
+    log('Ouverture du sélecteur Bluetooth...');
+    try {
+      const device = await navigator.bluetooth.requestDevice({
+        acceptAllDevices: true,
+        optionalServices: [0x1826, 0x180D, 0x180A]
+      });
+      log('✓ Appareil sélectionné : ' + (device.name || '(sans nom)'));
+      log('ID : ' + device.id);
+    } catch (e) {
+      log('❌ Erreur : ' + e.message);
+    }
+  }
+</script>
+</body>
+</html>
