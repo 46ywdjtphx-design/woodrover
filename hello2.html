@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hello v2</title>
+</head>
+<body style="font-family:sans-serif; padding:20px; background:#111; color:#eee;">
+<h1>Hello v2 - test polyfill différé</h1>
+
+<button onclick="check('NOW')" style="padding:14px; font-size:16px; width:100%; margin:6px 0;">1. Check navigator.bluetooth MAINTENANT</button>
+<button onclick="setTimeout(() => check('AFTER 2s'), 2000)" style="padding:14px; font-size:16px; width:100%; margin:6px 0;">2. Check après 2 secondes</button>
+<button onclick="testRequest()" style="padding:14px; font-size:16px; width:100%; margin:6px 0;">3. Tenter requestDevice direct</button>
+
+<pre id="out" style="background:#222; padding:12px; font-size:12px; white-space:pre-wrap; word-break:break-all;">Prêt.</pre>
+
+<script>
+const out = document.getElementById('out');
+function log(m) { out.textContent += '\n' + m; }
+
+log('[load] window loaded');
+log('[load] navigator.bluetooth: ' + (navigator.bluetooth ? 'PRÉSENT' : 'ABSENT'));
+log('[load] type: ' + typeof navigator.bluetooth);
+log('[load] userAgent: ' + navigator.userAgent.substring(0, 80));
+
+// Test après délai au cas où le polyfill s'injecte tard
+setTimeout(() => {
+  log('[+1s] navigator.bluetooth: ' + (navigator.bluetooth ? 'PRÉSENT' : 'ABSENT'));
+}, 1000);
+
+setTimeout(() => {
+  log('[+3s] navigator.bluetooth: ' + (navigator.bluetooth ? 'PRÉSENT' : 'ABSENT'));
+}, 3000);
+
+function check(label) {
+  log('[' + label + '] navigator.bluetooth: ' + (navigator.bluetooth ? 'PRÉSENT ✓' : 'ABSENT ✗'));
+  if (navigator.bluetooth) {
+    log('  → requestDevice: ' + (typeof navigator.bluetooth.requestDevice));
+  }
+}
+
+async function testRequest() {
+  log('▶ Tentative requestDevice...');
+  if (!navigator.bluetooth) {
+    log('  ✗ navigator.bluetooth absent, impossible');
+    return;
+  }
+  try {
+    const d = await navigator.bluetooth.requestDevice({
+      filters: [{ services: ['00001826-0000-1000-8000-00805f9b34fb'] }]
+    });
+    log('  ✓ Connecté à : ' + (d.name || '(sans nom)'));
+  } catch (e) {
+    log('  ✗ ' + (e && e.message ? e.message : (e === undefined ? 'undefined' : String(e))));
+  }
+}
+</script>
+</body>
+</html>
