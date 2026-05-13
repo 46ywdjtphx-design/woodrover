@@ -29,7 +29,6 @@
     font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif;
     font-size: 16px;
     -webkit-font-smoothing: antialiased;
-    overscroll-behavior: none;
     min-height: 100vh;
   }
   .app {
@@ -109,13 +108,6 @@
   .log .err { color: var(--danger); }
   .log .warn { color: var(--warning); }
   .log .hex { color: #c084fc; }
-  .banner {
-    background: var(--accent-dim); border: 1px solid var(--accent);
-    border-radius: var(--radius); padding: 12px 14px; margin-bottom: 16px;
-    font-size: 13px; line-height: 1.5;
-  }
-  .banner.hidden { display: none; }
-  .banner strong { color: white; }
   .footer { text-align: center; font-size: 11px; color: var(--text-muted); padding: 20px 0 10px; }
 </style>
 </head>
@@ -125,15 +117,10 @@
   <header>
     <div>
       <h1 class="title">Rameur Woodrover</h1>
-      <p class="subtitle" id="status">Non connecté</p>
+      <p class="subtitle" id="status">Initialisation...</p>
     </div>
     <div class="status-dot" id="dot"></div>
   </header>
-
-  <div class="banner hidden" id="ble-warning">
-    <strong>⚠️ Web Bluetooth indisponible</strong><br>
-    Ouvre cette page dans le navigateur <strong>Bluefy</strong> (gratuit, App Store).
-  </div>
 
   <div class="btn-row">
     <button class="primary" id="btn-connect">Se connecter</button>
@@ -152,309 +139,352 @@
     <div class="metric wide"><p class="metric-label">Fréquence cardiaque</p><p class="metric-value"><span id="m-hr">—</span><span class="metric-unit">bpm</span></p></div>
   </div>
 
-  <details>
+  <details open>
     <summary>Console diagnostic BLE</summary>
-    <div class="log" id="log">En attente de connexion...</div>
+    <div class="log" id="log">Chargement...</div>
   </details>
 
-  <details>
-    <summary>À propos</summary>
-    <div style="font-size:13px; color:var(--text-dim); line-height:1.6; padding-top:10px;">
-      MVP v1.1 — connexion Web Bluetooth au rameur Woodrover via FTMS (Fitness Machine Service).
-      Compatible Chrome desktop / Bluefy iOS. UUIDs en string complète pour compatibilité polyfill.
-    </div>
-  </details>
-
-  <div class="footer">Rameur App · v0.1.1</div>
+  <div class="footer">Rameur App · v0.1.2</div>
 </div>
 
 <script>
-'use strict';
+// ============================================================
+// Tout est encapsulé dans une IIFE qui démarre au DOMContentLoaded
+// pour garantir que tous les éléments existent au moment de l'init.
+// ============================================================
+(function() {
+  'use strict';
 
-// UUIDs au format STRING obligatoire pour Bluefy (le polyfill rejette les numbers)
-const UUID = {
-  FTMS_SERVICE:            '00001826-0000-1000-8000-00805f9b34fb',
-  ROWER_DATA:              '00002ad1-0000-1000-8000-00805f9b34fb',
-  FITNESS_MACHINE_FEATURE: '00002acc-0000-1000-8000-00805f9b34fb',
-  CONTROL_POINT:           '00002ad9-0000-1000-8000-00805f9b34fb',
-  HRS_SERVICE:             '0000180d-0000-1000-8000-00805f9b34fb',
-  HRM_CHARACTERISTIC:      '00002a37-0000-1000-8000-00805f9b34fb',
-  DEVICE_INFO:             '0000180a-0000-1000-8000-00805f9b34fb',
-};
-
-const state = {
-  device: null, server: null, characteristics: {},
-  connected: false, lastData: {},
-};
-
-const $ = (id) => document.getElementById(id);
-const els = {
-  status: $('status'), dot: $('dot'),
-  btnConnect: $('btn-connect'), btnDisconnect: $('btn-disconnect'),
-  log: $('log'), warning: $('ble-warning'),
-  spm: $('m-spm'), pwr: $('m-pwr'), pace: $('m-pace'), speed: $('m-speed'),
-  dist: $('m-dist'), time: $('m-time'), cal: $('m-cal'),
-  strokes: $('m-strokes'), hr: $('m-hr'),
-};
-
-function log(msg, type = 'info') {
-  const ts = new Date().toLocaleTimeString('fr-FR', { hour12: false });
-  const line = document.createElement('div');
-  line.className = type;
-  line.textContent = `[${ts}] ${msg}`;
-  els.log.appendChild(line);
-  els.log.scrollTop = els.log.scrollHeight;
-  while (els.log.childElementCount > 200) els.log.removeChild(els.log.firstChild);
-}
-
-function setStatus(text, dotClass = '') {
-  els.status.textContent = text;
-  els.dot.className = 'status-dot' + (dotClass ? ' ' + dotClass : '');
-}
-
-function setConnectedUI(connected) {
-  state.connected = connected;
-  els.btnConnect.disabled = connected;
-  els.btnDisconnect.disabled = !connected;
-}
-
-function resetMetrics() {
-  ['spm','pwr','speed','dist','cal','strokes','hr'].forEach(k => els[k].textContent = '—');
-  els.pace.textContent = '—';
-  els.time.textContent = '—';
-}
-
-function fmtTime(seconds) {
-  if (!Number.isFinite(seconds)) return '—';
-  const h = Math.floor(seconds / 3600);
-  const m = Math.floor((seconds % 3600) / 60);
-  const s = Math.floor(seconds % 60);
-  if (h > 0) return `${h}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
-  return `${m}:${String(s).padStart(2,'0')}`;
-}
-
-function bytesToHex(dataView) {
-  const arr = [];
-  for (let i = 0; i < dataView.byteLength; i++) {
-    arr.push(dataView.getUint8(i).toString(16).padStart(2, '0'));
-  }
-  return arr.join(' ');
-}
-
-// Capture d'erreur robuste (Bluefy renvoie parfois undefined)
-function describeError(e) {
-  if (e === undefined) return 'undefined';
-  if (e === null) return 'null';
-  if (typeof e === 'string') return e;
-  const parts = [];
-  if (e.name) parts.push(e.name);
-  if (e.message) parts.push(e.message);
-  if (!parts.length) { try { parts.push(String(e)); } catch {} }
-  return parts.join(' — ') || 'erreur inconnue';
-}
-
-// Parsing FTMS Rower Data (caractéristique 0x2AD1)
-function parseRowerData(dataView) {
-  const flags = dataView.getUint16(0, true);
-  let offset = 2;
-  const data = {};
-  const moreData = (flags & 0x0001) !== 0;
-
-  if (!moreData) {
-    if (offset + 1 <= dataView.byteLength) { data.strokeRate = dataView.getUint8(offset) * 0.5; offset += 1; }
-    if (offset + 2 <= dataView.byteLength) { data.strokeCount = dataView.getUint16(offset, true); offset += 2; }
-  }
-  if ((flags & 0x0002) && offset + 1 <= dataView.byteLength) { data.avgStrokeRate = dataView.getUint8(offset) * 0.5; offset += 1; }
-  if ((flags & 0x0004) && offset + 3 <= dataView.byteLength) {
-    data.totalDistance = dataView.getUint8(offset) | (dataView.getUint8(offset+1) << 8) | (dataView.getUint8(offset+2) << 16);
-    offset += 3;
-  }
-  if ((flags & 0x0008) && offset + 2 <= dataView.byteLength) { data.instantPace = dataView.getUint16(offset, true); offset += 2; }
-  if ((flags & 0x0010) && offset + 2 <= dataView.byteLength) { data.avgPace = dataView.getUint16(offset, true); offset += 2; }
-  if ((flags & 0x0020) && offset + 2 <= dataView.byteLength) { data.instantPower = dataView.getInt16(offset, true); offset += 2; }
-  if ((flags & 0x0040) && offset + 2 <= dataView.byteLength) { data.avgPower = dataView.getInt16(offset, true); offset += 2; }
-  if ((flags & 0x0080) && offset + 2 <= dataView.byteLength) { data.resistance = dataView.getInt16(offset, true); offset += 2; }
-  if ((flags & 0x0100)) {
-    if (offset + 2 <= dataView.byteLength) { data.totalEnergy = dataView.getUint16(offset, true); offset += 2; }
-    if (offset + 2 <= dataView.byteLength) { data.energyPerHour = dataView.getUint16(offset, true); offset += 2; }
-    if (offset + 1 <= dataView.byteLength) { data.energyPerMinute = dataView.getUint8(offset); offset += 1; }
-  }
-  if ((flags & 0x0200) && offset + 1 <= dataView.byteLength) { data.heartRate = dataView.getUint8(offset); offset += 1; }
-  if ((flags & 0x0400) && offset + 1 <= dataView.byteLength) { data.metabolicEquivalent = dataView.getUint8(offset) * 0.1; offset += 1; }
-  if ((flags & 0x0800) && offset + 2 <= dataView.byteLength) { data.elapsedTime = dataView.getUint16(offset, true); offset += 2; }
-  if ((flags & 0x1000) && offset + 2 <= dataView.byteLength) { data.remainingTime = dataView.getUint16(offset, true); offset += 2; }
-  return data;
-}
-
-function updateMetrics(d) {
-  Object.assign(state.lastData, d);
-  const s = state.lastData;
-  if (s.strokeRate !== undefined) els.spm.textContent = Math.round(s.strokeRate);
-  if (s.strokeCount !== undefined) els.strokes.textContent = s.strokeCount;
-  if (s.instantPower !== undefined) els.pwr.textContent = s.instantPower;
-  if (s.totalDistance !== undefined) els.dist.textContent = s.totalDistance;
-  if (s.totalEnergy !== undefined) els.cal.textContent = s.totalEnergy;
-  if (s.heartRate !== undefined) els.hr.textContent = s.heartRate;
-  if (s.elapsedTime !== undefined) els.time.textContent = fmtTime(s.elapsedTime);
-  if (s.instantPace !== undefined && s.instantPace > 0) {
-    const m = Math.floor(s.instantPace / 60);
-    const sec = Math.floor(s.instantPace % 60);
-    els.pace.textContent = `${m}:${String(sec).padStart(2,'0')}`;
-    const kmh = (500 / s.instantPace) * 3.6;
-    els.speed.textContent = kmh.toFixed(1);
-  }
-}
-
-function handleRowerNotification(event) {
-  const dv = event.target.value;
-  try {
-    const data = parseRowerData(dv);
-    updateMetrics(data);
-    const keys = Object.keys(data);
-    if (keys.length > 0) {
-      log(`📊 ${keys.map(k => `${k}=${data[k]}`).join(', ')}`, 'info');
-    }
-  } catch (e) {
-    log(`Parse error: ${describeError(e)} | raw: ${bytesToHex(dv)}`, 'err');
-  }
-}
-
-function handleHrNotification(event) {
-  const dv = event.target.value;
-  const flags = dv.getUint8(0);
-  const is16 = (flags & 0x01) !== 0;
-  const hr = is16 ? dv.getUint16(1, true) : dv.getUint8(1);
-  state.lastData.heartRate = hr;
-  els.hr.textContent = hr;
-}
-
-async function connect() {
-  if (!navigator.bluetooth) {
-    els.warning.classList.remove('hidden');
-    log('Web Bluetooth non supporté.', 'err');
-    return;
-  }
-
-  try {
-    setStatus('Recherche du rameur...', 'connecting');
-    log('Ouverture du sélecteur (filtre FTMS)...', 'info');
-
-    // Filtre sur FTMS : seuls les rameurs/machines fitness apparaissent.
-    // UUIDs en strings (obligatoire pour Bluefy).
-    state.device = await navigator.bluetooth.requestDevice({
-      filters: [{ services: [UUID.FTMS_SERVICE] }],
-      optionalServices: [UUID.FTMS_SERVICE, UUID.HRS_SERVICE, UUID.DEVICE_INFO],
-    });
-
-    log(`Sélectionné : ${state.device.name || '(sans nom)'} [${state.device.id}]`, 'ok');
-    state.device.addEventListener('gattserverdisconnected', onDisconnected);
-
-    setStatus('Connexion GATT...', 'connecting');
-    state.server = await state.device.gatt.connect();
-    log('GATT server connecté.', 'ok');
-
-    setStatus('Découverte des services...', 'connecting');
-    const services = await state.server.getPrimaryServices();
-    log(`${services.length} service(s) détecté(s).`, 'ok');
-    for (const svc of services) log(`  └─ ${svc.uuid}`, 'info');
-
+  // Capture globale d'erreurs pour ne JAMAIS planter silencieusement
+  window.addEventListener('error', function(ev) {
     try {
-      const ftms = await state.server.getPrimaryService(UUID.FTMS_SERVICE);
-      log('✓ Service FTMS trouvé.', 'ok');
-      await setupFTMS(ftms);
-    } catch (e) {
-      log(`FTMS setup : ${describeError(e)}`, 'err');
-    }
-
+      const logEl = document.getElementById('log');
+      if (logEl) {
+        const line = document.createElement('div');
+        line.style.color = '#f87171';
+        line.textContent = '⚠ JS Error: ' + ev.message + ' @ ' + (ev.filename || '?') + ':' + ev.lineno;
+        logEl.appendChild(line);
+      }
+    } catch(e) {}
+  });
+  window.addEventListener('unhandledrejection', function(ev) {
     try {
-      const hrs = await state.server.getPrimaryService(UUID.HRS_SERVICE);
-      const hrm = await hrs.getCharacteristic(UUID.HRM_CHARACTERISTIC);
-      await hrm.startNotifications();
-      hrm.addEventListener('characteristicvaluechanged', handleHrNotification);
-      log('✓ Heart Rate activé.', 'ok');
-    } catch (e) {
-      log(`HR non dispo (normal sans ceinture).`, 'info');
+      const logEl = document.getElementById('log');
+      if (logEl) {
+        const line = document.createElement('div');
+        line.style.color = '#f87171';
+        line.textContent = '⚠ Unhandled rejection: ' + (ev.reason && ev.reason.message ? ev.reason.message : String(ev.reason));
+        logEl.appendChild(line);
+      }
+    } catch(e) {}
+  });
+
+  function init() {
+    // UUIDs au format STRING (Bluefy refuse les numbers)
+    const UUID = {
+      FTMS_SERVICE:            '00001826-0000-1000-8000-00805f9b34fb',
+      ROWER_DATA:              '00002ad1-0000-1000-8000-00805f9b34fb',
+      FITNESS_MACHINE_FEATURE: '00002acc-0000-1000-8000-00805f9b34fb',
+      CONTROL_POINT:           '00002ad9-0000-1000-8000-00805f9b34fb',
+      HRS_SERVICE:             '0000180d-0000-1000-8000-00805f9b34fb',
+      HRM_CHARACTERISTIC:      '00002a37-0000-1000-8000-00805f9b34fb',
+      DEVICE_INFO:             '0000180a-0000-1000-8000-00805f9b34fb',
+    };
+
+    const state = {
+      device: null, server: null, characteristics: {},
+      connected: false, lastData: {},
+    };
+
+    // Récupération sécurisée des éléments avec vérification
+    const ids = ['status','dot','btn-connect','btn-disconnect','log',
+                 'm-spm','m-pwr','m-pace','m-speed','m-dist','m-time',
+                 'm-cal','m-strokes','m-hr'];
+    const els = {};
+    const missing = [];
+    for (let i = 0; i < ids.length; i++) {
+      const el = document.getElementById(ids[i]);
+      if (!el) missing.push(ids[i]);
+      els[ids[i]] = el;
+    }
+    if (missing.length > 0) {
+      alert('Erreur init : éléments manquants : ' + missing.join(', '));
+      return;
     }
 
-    setStatus(`Connecté à ${state.device.name || 'rameur'}`, 'connected');
-    setConnectedUI(true);
+    function log(msg, type) {
+      type = type || 'info';
+      const ts = new Date().toLocaleTimeString('fr-FR', { hour12: false });
+      const line = document.createElement('div');
+      line.className = type;
+      line.textContent = '[' + ts + '] ' + msg;
+      els['log'].appendChild(line);
+      els['log'].scrollTop = els['log'].scrollHeight;
+      while (els['log'].childElementCount > 200) els['log'].removeChild(els['log'].firstChild);
+    }
 
-  } catch (e) {
-    log(`Erreur connexion : ${describeError(e)}`, 'err');
-    setStatus('Échec de connexion', '');
-    setConnectedUI(false);
+    function setStatus(text, dotClass) {
+      els['status'].textContent = text;
+      els['dot'].className = 'status-dot' + (dotClass ? ' ' + dotClass : '');
+    }
+
+    function setConnectedUI(connected) {
+      state.connected = connected;
+      els['btn-connect'].disabled = connected;
+      els['btn-disconnect'].disabled = !connected;
+    }
+
+    function resetMetrics() {
+      ['m-spm','m-pwr','m-speed','m-dist','m-cal','m-strokes','m-hr'].forEach(function(k){
+        els[k].textContent = '—';
+      });
+      els['m-pace'].textContent = '—';
+      els['m-time'].textContent = '—';
+    }
+
+    function fmtTime(seconds) {
+      if (!Number.isFinite(seconds)) return '—';
+      const h = Math.floor(seconds / 3600);
+      const m = Math.floor((seconds % 3600) / 60);
+      const s = Math.floor(seconds % 60);
+      if (h > 0) return h + ':' + String(m).padStart(2,'0') + ':' + String(s).padStart(2,'0');
+      return m + ':' + String(s).padStart(2,'0');
+    }
+
+    function bytesToHex(dv) {
+      const arr = [];
+      for (let i = 0; i < dv.byteLength; i++) {
+        arr.push(dv.getUint8(i).toString(16).padStart(2, '0'));
+      }
+      return arr.join(' ');
+    }
+
+    function describeError(e) {
+      if (e === undefined) return 'undefined';
+      if (e === null) return 'null';
+      if (typeof e === 'string') return e;
+      const parts = [];
+      if (e.name) parts.push(e.name);
+      if (e.message) parts.push(e.message);
+      if (!parts.length) { try { parts.push(String(e)); } catch(_){} }
+      return parts.join(' — ') || 'erreur inconnue';
+    }
+
+    function parseRowerData(dv) {
+      const flags = dv.getUint16(0, true);
+      let offset = 2;
+      const data = {};
+      const moreData = (flags & 0x0001) !== 0;
+      if (!moreData) {
+        if (offset + 1 <= dv.byteLength) { data.strokeRate = dv.getUint8(offset) * 0.5; offset += 1; }
+        if (offset + 2 <= dv.byteLength) { data.strokeCount = dv.getUint16(offset, true); offset += 2; }
+      }
+      if ((flags & 0x0002) && offset + 1 <= dv.byteLength) { data.avgStrokeRate = dv.getUint8(offset) * 0.5; offset += 1; }
+      if ((flags & 0x0004) && offset + 3 <= dv.byteLength) {
+        data.totalDistance = dv.getUint8(offset) | (dv.getUint8(offset+1) << 8) | (dv.getUint8(offset+2) << 16);
+        offset += 3;
+      }
+      if ((flags & 0x0008) && offset + 2 <= dv.byteLength) { data.instantPace = dv.getUint16(offset, true); offset += 2; }
+      if ((flags & 0x0010) && offset + 2 <= dv.byteLength) { data.avgPace = dv.getUint16(offset, true); offset += 2; }
+      if ((flags & 0x0020) && offset + 2 <= dv.byteLength) { data.instantPower = dv.getInt16(offset, true); offset += 2; }
+      if ((flags & 0x0040) && offset + 2 <= dv.byteLength) { data.avgPower = dv.getInt16(offset, true); offset += 2; }
+      if ((flags & 0x0080) && offset + 2 <= dv.byteLength) { data.resistance = dv.getInt16(offset, true); offset += 2; }
+      if ((flags & 0x0100)) {
+        if (offset + 2 <= dv.byteLength) { data.totalEnergy = dv.getUint16(offset, true); offset += 2; }
+        if (offset + 2 <= dv.byteLength) { data.energyPerHour = dv.getUint16(offset, true); offset += 2; }
+        if (offset + 1 <= dv.byteLength) { data.energyPerMinute = dv.getUint8(offset); offset += 1; }
+      }
+      if ((flags & 0x0200) && offset + 1 <= dv.byteLength) { data.heartRate = dv.getUint8(offset); offset += 1; }
+      if ((flags & 0x0400) && offset + 1 <= dv.byteLength) { data.metabolicEquivalent = dv.getUint8(offset) * 0.1; offset += 1; }
+      if ((flags & 0x0800) && offset + 2 <= dv.byteLength) { data.elapsedTime = dv.getUint16(offset, true); offset += 2; }
+      if ((flags & 0x1000) && offset + 2 <= dv.byteLength) { data.remainingTime = dv.getUint16(offset, true); offset += 2; }
+      return data;
+    }
+
+    function updateMetrics(d) {
+      Object.assign(state.lastData, d);
+      const s = state.lastData;
+      if (s.strokeRate !== undefined) els['m-spm'].textContent = Math.round(s.strokeRate);
+      if (s.strokeCount !== undefined) els['m-strokes'].textContent = s.strokeCount;
+      if (s.instantPower !== undefined) els['m-pwr'].textContent = s.instantPower;
+      if (s.totalDistance !== undefined) els['m-dist'].textContent = s.totalDistance;
+      if (s.totalEnergy !== undefined) els['m-cal'].textContent = s.totalEnergy;
+      if (s.heartRate !== undefined) els['m-hr'].textContent = s.heartRate;
+      if (s.elapsedTime !== undefined) els['m-time'].textContent = fmtTime(s.elapsedTime);
+      if (s.instantPace !== undefined && s.instantPace > 0) {
+        const m = Math.floor(s.instantPace / 60);
+        const sec = Math.floor(s.instantPace % 60);
+        els['m-pace'].textContent = m + ':' + String(sec).padStart(2,'0');
+        const kmh = (500 / s.instantPace) * 3.6;
+        els['m-speed'].textContent = kmh.toFixed(1);
+      }
+    }
+
+    function handleRowerNotification(event) {
+      const dv = event.target.value;
+      try {
+        const data = parseRowerData(dv);
+        updateMetrics(data);
+        const keys = Object.keys(data);
+        if (keys.length > 0) {
+          const parts = keys.map(function(k){ return k + '=' + data[k]; });
+          log('📊 ' + parts.join(', '), 'info');
+        }
+      } catch (e) {
+        log('Parse error: ' + describeError(e) + ' | raw: ' + bytesToHex(dv), 'err');
+      }
+    }
+
+    function handleHrNotification(event) {
+      const dv = event.target.value;
+      const flags = dv.getUint8(0);
+      const is16 = (flags & 0x01) !== 0;
+      const hr = is16 ? dv.getUint16(1, true) : dv.getUint8(1);
+      state.lastData.heartRate = hr;
+      els['m-hr'].textContent = hr;
+    }
+
+    async function connect() {
+      log('▶ Tap "Se connecter" détecté.', 'info');
+      if (!navigator.bluetooth) {
+        log('navigator.bluetooth indisponible. Utilise Bluefy.', 'err');
+        return;
+      }
+      try {
+        setStatus('Recherche du rameur...', 'connecting');
+        log('Ouverture du sélecteur (filtre FTMS)...', 'info');
+
+        state.device = await navigator.bluetooth.requestDevice({
+          filters: [{ services: [UUID.FTMS_SERVICE] }],
+          optionalServices: [UUID.FTMS_SERVICE, UUID.HRS_SERVICE, UUID.DEVICE_INFO],
+        });
+
+        log('Sélectionné : ' + (state.device.name || '(sans nom)'), 'ok');
+        state.device.addEventListener('gattserverdisconnected', onDisconnected);
+
+        setStatus('Connexion GATT...', 'connecting');
+        state.server = await state.device.gatt.connect();
+        log('GATT server connecté.', 'ok');
+
+        setStatus('Découverte des services...', 'connecting');
+        const services = await state.server.getPrimaryServices();
+        log(services.length + ' service(s) détecté(s).', 'ok');
+        for (let i = 0; i < services.length; i++) {
+          log('  └─ ' + services[i].uuid, 'info');
+        }
+
+        try {
+          const ftms = await state.server.getPrimaryService(UUID.FTMS_SERVICE);
+          log('✓ Service FTMS trouvé.', 'ok');
+          await setupFTMS(ftms);
+        } catch (e) {
+          log('FTMS setup : ' + describeError(e), 'err');
+        }
+
+        try {
+          const hrs = await state.server.getPrimaryService(UUID.HRS_SERVICE);
+          const hrm = await hrs.getCharacteristic(UUID.HRM_CHARACTERISTIC);
+          await hrm.startNotifications();
+          hrm.addEventListener('characteristicvaluechanged', handleHrNotification);
+          log('✓ Heart Rate activé.', 'ok');
+        } catch (e) {
+          log('HR non dispo (normal sans ceinture).', 'info');
+        }
+
+        setStatus('Connecté à ' + (state.device.name || 'rameur'), 'connected');
+        setConnectedUI(true);
+
+      } catch (e) {
+        log('Erreur connexion : ' + describeError(e), 'err');
+        setStatus('Échec de connexion', '');
+        setConnectedUI(false);
+      }
+    }
+
+    async function setupFTMS(ftms) {
+      const chars = await ftms.getCharacteristics();
+      log('FTMS : ' + chars.length + ' caractéristique(s)', 'info');
+      for (let i = 0; i < chars.length; i++) {
+        const c = chars[i];
+        const props = [];
+        if (c.properties.read) props.push('read');
+        if (c.properties.notify) props.push('notify');
+        if (c.properties.write) props.push('write');
+        if (c.properties.writeWithoutResponse) props.push('writeNR');
+        if (c.properties.indicate) props.push('indicate');
+        log('  └─ ' + c.uuid + ' [' + props.join(',') + ']', 'info');
+      }
+
+      try {
+        const rowerData = await ftms.getCharacteristic(UUID.ROWER_DATA);
+        await rowerData.startNotifications();
+        rowerData.addEventListener('characteristicvaluechanged', handleRowerNotification);
+        state.characteristics.rowerData = rowerData;
+        log('✓ Rower Data notifications ON.', 'ok');
+      } catch (e) {
+        log('Rower Data : ' + describeError(e), 'err');
+      }
+
+      try {
+        const feat = await ftms.getCharacteristic(UUID.FITNESS_MACHINE_FEATURE);
+        const val = await feat.readValue();
+        log('Features hex : ' + bytesToHex(val), 'hex');
+      } catch (e) {
+        log('Features : ' + describeError(e), 'warn');
+      }
+
+      try {
+        const cp = await ftms.getCharacteristic(UUID.CONTROL_POINT);
+        state.characteristics.controlPoint = cp;
+        log('✓ Control Point disponible.', 'ok');
+      } catch (e) {
+        log('Control Point indispo.', 'warn');
+      }
+    }
+
+    function onDisconnected() {
+      log('Déconnexion GATT.', 'warn');
+      setStatus('Déconnecté', '');
+      setConnectedUI(false);
+      state.server = null;
+      state.characteristics = {};
+    }
+
+    async function disconnect() {
+      if (state.device && state.device.gatt.connected) {
+        state.device.gatt.disconnect();
+      }
+      setConnectedUI(false);
+      setStatus('Non connecté', '');
+      resetMetrics();
+      log('Déconnexion manuelle.', 'info');
+    }
+
+    // Init UI
+    els['log'].textContent = '';
+    log('App initialisée. v0.1.2', 'info');
+
+    if (!navigator.bluetooth) {
+      log('⚠ navigator.bluetooth indisponible. Ouvre cette page dans Bluefy.', 'err');
+      els['btn-connect'].disabled = true;
+      setStatus('Bluefy requis', '');
+    } else {
+      log('✓ Web Bluetooth disponible. Prêt à connecter.', 'ok');
+      setStatus('Non connecté', '');
+    }
+
+    els['btn-connect'].addEventListener('click', connect);
+    els['btn-disconnect'].addEventListener('click', disconnect);
+    log('✓ Boutons activés.', 'ok');
   }
-}
 
-async function setupFTMS(ftms) {
-  const chars = await ftms.getCharacteristics();
-  log(`FTMS : ${chars.length} caractéristique(s)`, 'info');
-  for (const c of chars) {
-    const props = [];
-    if (c.properties.read) props.push('read');
-    if (c.properties.notify) props.push('notify');
-    if (c.properties.write) props.push('write');
-    if (c.properties.writeWithoutResponse) props.push('writeNR');
-    if (c.properties.indicate) props.push('indicate');
-    log(`  └─ ${c.uuid} [${props.join(',')}]`, 'info');
-  }
-
-  try {
-    const rowerData = await ftms.getCharacteristic(UUID.ROWER_DATA);
-    await rowerData.startNotifications();
-    rowerData.addEventListener('characteristicvaluechanged', handleRowerNotification);
-    state.characteristics.rowerData = rowerData;
-    log('✓ Rower Data notifications ON (0x2AD1).', 'ok');
-  } catch (e) {
-    log(`Rower Data : ${describeError(e)}`, 'err');
-  }
-
-  try {
-    const feat = await ftms.getCharacteristic(UUID.FITNESS_MACHINE_FEATURE);
-    const val = await feat.readValue();
-    log(`Features hex : ${bytesToHex(val)}`, 'hex');
-  } catch (e) {
-    log(`Features : ${describeError(e)}`, 'warn');
-  }
-
-  try {
-    const cp = await ftms.getCharacteristic(UUID.CONTROL_POINT);
-    state.characteristics.controlPoint = cp;
-    log('✓ Control Point disponible (pilotage futur).', 'ok');
-  } catch (e) {
-    log(`Control Point indispo.`, 'warn');
-  }
-}
-
-function onDisconnected() {
-  log('Déconnexion GATT.', 'warn');
-  setStatus('Déconnecté', '');
-  setConnectedUI(false);
-  state.server = null;
-  state.characteristics = {};
-}
-
-async function disconnect() {
-  if (state.device && state.device.gatt.connected) {
-    state.device.gatt.disconnect();
-  }
-  setConnectedUI(false);
-  setStatus('Non connecté', '');
-  resetMetrics();
-  log('Déconnexion manuelle.', 'info');
-}
-
-window.addEventListener('DOMContentLoaded', () => {
-  if (!navigator.bluetooth) {
-    els.warning.classList.remove('hidden');
-    els.btnConnect.disabled = true;
-    log('⚠ navigator.bluetooth indisponible. Utilise Bluefy.', 'err');
+  // Démarre uniquement quand le DOM est totalement prêt
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', init);
   } else {
-    log('Web Bluetooth disponible. Prêt à connecter.', 'ok');
+    init();
   }
-  els.btnConnect.addEventListener('click', connect);
-  els.btnDisconnect.addEventListener('click', disconnect);
-});
+})();
 </script>
 </body>
 </html>
