@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Test BLE v2</title>
+<style>
+  body { font-family: -apple-system, sans-serif; padding: 20px; background: #111; color: #eee; }
+  h1 { font-size: 20px; }
+  h2 { font-size: 15px; color: #4f8cff; margin-top: 24px; }
+  button { font-size: 16px; padding: 14px 16px; margin: 6px 0; width: 100%; border-radius: 8px; border: none; background: #4f8cff; color: white; text-align: left; }
+  button.small { background: #333; font-size: 14px; padding: 12px; }
+  pre { background: #222; padding: 12px; border-radius: 8px; font-size: 11px; white-space: pre-wrap; word-break: break-all; line-height: 1.5; max-height: 60vh; overflow-y: auto; }
+  .clear { background: #555; }
+</style>
+</head>
+<body>
+  <h1>Diagnostic BLE v2</h1>
+  <p>Tape chaque bouton, regarde le résultat. Le but : trouver lequel ouvre le sélecteur.</p>
+
+  <h2>Variantes acceptAllDevices</h2>
+  <button class="small" onclick="testA()">A — acceptAllDevices sans optionalServices</button>
+  <button class="small" onclick="testB()">B — acceptAllDevices + optionalServices number</button>
+  <button class="small" onclick="testC()">C — acceptAllDevices + optionalServices string</button>
+
+  <h2>Variantes filters</h2>
+  <button class="small" onclick="testD()">D — filter par service FTMS (number)</button>
+  <button class="small" onclick="testE()">E — filter par service FTMS (string)</button>
+  <button class="small" onclick="testF()">F — filter par namePrefix vide</button>
+
+  <h2>Utilitaires</h2>
+  <button class="clear" onclick="clearLog()">Effacer console</button>
+
+  <pre id="out">Prêt. Tape un bouton.</pre>
+
+<script>
+  const out = document.getElementById('out');
+  function log(msg) {
+    const ts = new Date().toLocaleTimeString();
+    out.textContent += `\n[${ts}] ${msg}`;
+    out.scrollTop = out.scrollHeight;
+  }
+  function clearLog() { out.textContent = 'Console effacée.'; }
+
+  // Capture EXHAUSTIVE de toute erreur, quel que soit son type
+  function describeError(e) {
+    if (e === undefined) return 'undefined (aucun objet erreur)';
+    if (e === null) return 'null';
+    if (typeof e === 'string') return `string: "${e}"`;
+    if (typeof e === 'number') return `number: ${e}`;
+    const parts = [];
+    parts.push(`type: ${typeof e}`);
+    parts.push(`constructor: ${e.constructor?.name || '?'}`);
+    if (e.name) parts.push(`name: ${e.name}`);
+    if (e.message) parts.push(`message: "${e.message}"`);
+    if (e.code !== undefined) parts.push(`code: ${e.code}`);
+    if (e.stack) parts.push(`stack: ${String(e.stack).slice(0, 200)}`);
+    // Toutes les propriétés énumérables
+    try {
+      const json = JSON.stringify(e, Object.getOwnPropertyNames(e));
+      parts.push(`json: ${json.slice(0, 300)}`);
+    } catch {}
+    // toString
+    try { parts.push(`toString: ${String(e).slice(0, 200)}`); } catch {}
+    return parts.join(' | ');
+  }
+
+  async function run(label, options) {
+    log(`▶ ${label}`);
+    log(`  options: ${JSON.stringify(options)}`);
+    try {
+      const device = await navigator.bluetooth.requestDevice(options);
+      log(`  ✓ SUCCÈS — nom: "${device.name || '(sans nom)'}", id: ${device.id}`);
+    } catch (e) {
+      log(`  ✗ ERREUR → ${describeError(e)}`);
+    }
+  }
+
+  async function testA() {
+    await run('A — acceptAllDevices sans optionalServices', {
+      acceptAllDevices: true
+    });
+  }
+
+  async function testB() {
+    await run('B — acceptAllDevices + optionalServices (number)', {
+      acceptAllDevices: true,
+      optionalServices: [0x1826, 0x180D, 0x180A]
+    });
+  }
+
+  async function testC() {
+    await run('C — acceptAllDevices + optionalServices (string)', {
+      acceptAllDevices: true,
+      optionalServices: [
+        '00001826-0000-1000-8000-00805f9b34fb',
+        '0000180d-0000-1000-8000-00805f9b34fb',
+        '0000180a-0000-1000-8000-00805f9b34fb'
+      ]
+    });
+  }
+
+  async function testD() {
+    await run('D — filter par FTMS (number)', {
+      filters: [{ services: [0x1826] }]
+    });
+  }
+
+  async function testE() {
+    await run('E — filter par FTMS (string)', {
+      filters: [{ services: ['00001826-0000-1000-8000-00805f9b34fb'] }]
+    });
+  }
+
+  async function testF() {
+    await run('F — filter par namePrefix vide (toutes les pubs)', {
+      filters: [{ namePrefix: '' }]
+    });
+  }
+</script>
+</body>
+</html>
