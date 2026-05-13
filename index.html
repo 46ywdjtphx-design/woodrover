@@ -17,7 +17,9 @@
     --accent: #4f8cff;
     --accent-dim: #1e3a6f;
     --success: #34d399;
+    --success-dim: #064e3b;
     --danger: #f87171;
+    --danger-dim: #7f1d1d;
     --warning: #fbbf24;
     --border: #2a2e38;
     --radius: 10px;
@@ -38,7 +40,7 @@
   }
   header {
     display: flex; align-items: center; justify-content: space-between;
-    padding: 12px 0 20px;
+    padding: 12px 0 16px;
   }
   .title { font-size: 20px; font-weight: 600; margin: 0; }
   .subtitle { font-size: 13px; color: var(--text-dim); margin: 2px 0 0; }
@@ -48,8 +50,9 @@
   }
   .status-dot.connected { background: var(--success); }
   .status-dot.connecting { background: var(--warning); animation: pulse 1.2s infinite; }
+  .status-dot.running { background: var(--success); animation: pulse 1.2s infinite; }
   @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
-  .btn-row { display: flex; gap: 10px; margin-bottom: 20px; }
+  .btn-row { display: flex; gap: 10px; margin-bottom: 12px; }
   button {
     flex: 1;
     appearance: none; -webkit-appearance: none;
@@ -65,9 +68,11 @@
   button:disabled { opacity: 0.4; cursor: not-allowed; }
   button.primary { background: var(--accent); border-color: var(--accent); color: white; }
   button.primary:active:not(:disabled) { background: #3b75db; }
+  button.success { background: var(--success-dim); border-color: var(--success); color: var(--success); }
+  button.danger  { background: var(--danger-dim); border-color: var(--danger); color: var(--danger); }
   .metrics-grid {
     display: grid; grid-template-columns: repeat(2, 1fr);
-    gap: 10px; margin-bottom: 20px;
+    gap: 10px; margin: 16px 0 20px;
   }
   .metric {
     background: var(--surface); border: 1px solid var(--border);
@@ -108,6 +113,7 @@
   .log .err { color: var(--danger); }
   .log .warn { color: var(--warning); }
   .log .hex { color: #c084fc; }
+  .log .data { color: #60a5fa; }
   .footer { text-align: center; font-size: 11px; color: var(--text-muted); padding: 20px 0 10px; }
 </style>
 </head>
@@ -127,6 +133,11 @@
     <button id="btn-disconnect" disabled>Déconnecter</button>
   </div>
 
+  <div class="btn-row">
+    <button class="success" id="btn-start" disabled>▶ Démarrer</button>
+    <button class="danger" id="btn-stop" disabled>■ Arrêter</button>
+  </div>
+
   <div class="metrics-grid">
     <div class="metric"><p class="metric-label">Cadence</p><p class="metric-value"><span id="m-spm">—</span><span class="metric-unit">spm</span></p></div>
     <div class="metric"><p class="metric-label">Puissance</p><p class="metric-value"><span id="m-pwr">—</span><span class="metric-unit">W</span></p></div>
@@ -135,7 +146,7 @@
     <div class="metric"><p class="metric-label">Distance</p><p class="metric-value"><span id="m-dist">—</span><span class="metric-unit">m</span></p></div>
     <div class="metric"><p class="metric-label">Temps</p><p class="metric-value" id="m-time">—</p></div>
     <div class="metric"><p class="metric-label">Calories</p><p class="metric-value"><span id="m-cal">—</span><span class="metric-unit">kcal</span></p></div>
-    <div class="metric"><p class="metric-label">Coups totaux</p><p class="metric-value" id="m-strokes">—</p></div>
+    <div class="metric"><p class="metric-label">Résistance</p><p class="metric-value" id="m-res">—</p></div>
     <div class="metric wide"><p class="metric-label">Fréquence cardiaque</p><p class="metric-value"><span id="m-hr">—</span><span class="metric-unit">bpm</span></p></div>
   </div>
 
@@ -144,18 +155,13 @@
     <div class="log" id="log">Chargement...</div>
   </details>
 
-  <div class="footer">Rameur App · v0.1.2</div>
+  <div class="footer">Rameur App · v0.1.3</div>
 </div>
 
 <script>
-// ============================================================
-// Tout est encapsulé dans une IIFE qui démarre au DOMContentLoaded
-// pour garantir que tous les éléments existent au moment de l'init.
-// ============================================================
 (function() {
   'use strict';
 
-  // Capture globale d'erreurs pour ne JAMAIS planter silencieusement
   window.addEventListener('error', function(ev) {
     try {
       const logEl = document.getElementById('log');
@@ -180,26 +186,46 @@
   });
 
   function init() {
-    // UUIDs au format STRING (Bluefy refuse les numbers)
     const UUID = {
       FTMS_SERVICE:            '00001826-0000-1000-8000-00805f9b34fb',
       ROWER_DATA:              '00002ad1-0000-1000-8000-00805f9b34fb',
       FITNESS_MACHINE_FEATURE: '00002acc-0000-1000-8000-00805f9b34fb',
+      FITNESS_MACHINE_STATUS:  '00002ada-0000-1000-8000-00805f9b34fb',
       CONTROL_POINT:           '00002ad9-0000-1000-8000-00805f9b34fb',
+      TRAINING_STATUS:         '00002ad3-0000-1000-8000-00805f9b34fb',
       HRS_SERVICE:             '0000180d-0000-1000-8000-00805f9b34fb',
       HRM_CHARACTERISTIC:      '00002a37-0000-1000-8000-00805f9b34fb',
       DEVICE_INFO:             '0000180a-0000-1000-8000-00805f9b34fb',
     };
 
-    const state = {
-      device: null, server: null, characteristics: {},
-      connected: false, lastData: {},
+    // FTMS Control Point opcodes (cf. Bluetooth GATT Specification)
+    const FTMS_OPCODE = {
+      REQUEST_CONTROL: 0x00,
+      RESET: 0x01,
+      SET_TARGET_RESISTANCE: 0x04,
+      SET_TARGET_POWER: 0x05,
+      START_OR_RESUME: 0x07,
+      STOP_OR_PAUSE: 0x08, // param: 0x01 stop, 0x02 pause
+      RESPONSE_CODE: 0x80,
     };
 
-    // Récupération sécurisée des éléments avec vérification
-    const ids = ['status','dot','btn-connect','btn-disconnect','log',
+    const FTMS_RESULT = {
+      0x01: 'Success',
+      0x02: 'Op Code not supported',
+      0x03: 'Invalid Parameter',
+      0x04: 'Operation Failed',
+      0x05: 'Control Not Permitted',
+    };
+
+    const state = {
+      device: null, server: null, characteristics: {},
+      connected: false, sessionActive: false,
+      lastData: {}, lastLogTime: 0,
+    };
+
+    const ids = ['status','dot','btn-connect','btn-disconnect','btn-start','btn-stop','log',
                  'm-spm','m-pwr','m-pace','m-speed','m-dist','m-time',
-                 'm-cal','m-strokes','m-hr'];
+                 'm-cal','m-res','m-hr'];
     const els = {};
     const missing = [];
     for (let i = 0; i < ids.length; i++) {
@@ -228,14 +254,16 @@
       els['dot'].className = 'status-dot' + (dotClass ? ' ' + dotClass : '');
     }
 
-    function setConnectedUI(connected) {
-      state.connected = connected;
-      els['btn-connect'].disabled = connected;
-      els['btn-disconnect'].disabled = !connected;
+    function updateButtons() {
+      els['btn-connect'].disabled = state.connected;
+      els['btn-disconnect'].disabled = !state.connected;
+      const hasCp = !!state.characteristics.controlPoint;
+      els['btn-start'].disabled = !state.connected || !hasCp || state.sessionActive;
+      els['btn-stop'].disabled = !state.connected || !hasCp || !state.sessionActive;
     }
 
     function resetMetrics() {
-      ['m-spm','m-pwr','m-speed','m-dist','m-cal','m-strokes','m-hr'].forEach(function(k){
+      ['m-spm','m-pwr','m-speed','m-dist','m-cal','m-hr','m-res'].forEach(function(k){
         els[k].textContent = '—';
       });
       els['m-pace'].textContent = '—';
@@ -305,18 +333,21 @@
       Object.assign(state.lastData, d);
       const s = state.lastData;
       if (s.strokeRate !== undefined) els['m-spm'].textContent = Math.round(s.strokeRate);
-      if (s.strokeCount !== undefined) els['m-strokes'].textContent = s.strokeCount;
       if (s.instantPower !== undefined) els['m-pwr'].textContent = s.instantPower;
       if (s.totalDistance !== undefined) els['m-dist'].textContent = s.totalDistance;
       if (s.totalEnergy !== undefined) els['m-cal'].textContent = s.totalEnergy;
       if (s.heartRate !== undefined) els['m-hr'].textContent = s.heartRate;
       if (s.elapsedTime !== undefined) els['m-time'].textContent = fmtTime(s.elapsedTime);
+      if (s.resistance !== undefined) els['m-res'].textContent = s.resistance;
       if (s.instantPace !== undefined && s.instantPace > 0) {
         const m = Math.floor(s.instantPace / 60);
         const sec = Math.floor(s.instantPace % 60);
         els['m-pace'].textContent = m + ':' + String(sec).padStart(2,'0');
         const kmh = (500 / s.instantPace) * 3.6;
         els['m-speed'].textContent = kmh.toFixed(1);
+      } else if (s.instantPace === 0) {
+        els['m-pace'].textContent = '—';
+        els['m-speed'].textContent = '0.0';
       }
     }
 
@@ -325,10 +356,14 @@
       try {
         const data = parseRowerData(dv);
         updateMetrics(data);
-        const keys = Object.keys(data);
-        if (keys.length > 0) {
-          const parts = keys.map(function(k){ return k + '=' + data[k]; });
-          log('📊 ' + parts.join(', '), 'info');
+        // Throttle log : max 1 toutes les 2 secondes pour ne pas spammer
+        const now = Date.now();
+        if (now - state.lastLogTime > 2000) {
+          state.lastLogTime = now;
+          const s = state.lastData;
+          log('📊 cad=' + Math.round(s.strokeRate||0) + ' pwr=' + (s.instantPower||0)
+              + ' dist=' + (s.totalDistance||0) + 'm res=' + (s.resistance||0)
+              + ' t=' + fmtTime(s.elapsedTime||0), 'data');
         }
       } catch (e) {
         log('Parse error: ' + describeError(e) + ' | raw: ' + bytesToHex(dv), 'err');
@@ -344,6 +379,41 @@
       els['m-hr'].textContent = hr;
     }
 
+    function handleControlPointResponse(event) {
+      const dv = event.target.value;
+      const hex = bytesToHex(dv);
+      // Format réponse FTMS : 0x80 [requestedOpCode] [resultCode] [params...]
+      if (dv.byteLength >= 3 && dv.getUint8(0) === FTMS_OPCODE.RESPONSE_CODE) {
+        const reqOp = dv.getUint8(1);
+        const result = dv.getUint8(2);
+        const resultText = FTMS_RESULT[result] || ('Code ' + result);
+        log('↩ CP réponse op=0x' + reqOp.toString(16) + ' → ' + resultText, result === 1 ? 'ok' : 'warn');
+      } else {
+        log('↩ CP indication brute : ' + hex, 'hex');
+      }
+    }
+
+    function handleStatusNotification(event) {
+      const dv = event.target.value;
+      log('📡 Status: ' + bytesToHex(dv), 'hex');
+    }
+
+    function handleTrainingStatusNotification(event) {
+      const dv = event.target.value;
+      log('🏋 Training: ' + bytesToHex(dv), 'hex');
+    }
+
+    // Envoi d'une commande sur le Control Point (avec retour de promesse)
+    async function sendCpCommand(opcode, params) {
+      const cp = state.characteristics.controlPoint;
+      if (!cp) throw new Error('Control Point non disponible');
+      const arr = [opcode];
+      if (params) for (let i = 0; i < params.length; i++) arr.push(params[i]);
+      const buf = new Uint8Array(arr);
+      log('→ CP write : ' + Array.from(buf).map(function(b){return b.toString(16).padStart(2,'0');}).join(' '), 'hex');
+      await cp.writeValue(buf);
+    }
+
     async function connect() {
       log('▶ Tap "Se connecter" détecté.', 'info');
       if (!navigator.bluetooth) {
@@ -352,7 +422,6 @@
       }
       try {
         setStatus('Recherche du rameur...', 'connecting');
-        log('Ouverture du sélecteur (filtre FTMS)...', 'info');
 
         state.device = await navigator.bluetooth.requestDevice({
           filters: [{ services: [UUID.FTMS_SERVICE] }],
@@ -366,20 +435,9 @@
         state.server = await state.device.gatt.connect();
         log('GATT server connecté.', 'ok');
 
-        setStatus('Découverte des services...', 'connecting');
-        const services = await state.server.getPrimaryServices();
-        log(services.length + ' service(s) détecté(s).', 'ok');
-        for (let i = 0; i < services.length; i++) {
-          log('  └─ ' + services[i].uuid, 'info');
-        }
-
-        try {
-          const ftms = await state.server.getPrimaryService(UUID.FTMS_SERVICE);
-          log('✓ Service FTMS trouvé.', 'ok');
-          await setupFTMS(ftms);
-        } catch (e) {
-          log('FTMS setup : ' + describeError(e), 'err');
-        }
+        const ftms = await state.server.getPrimaryService(UUID.FTMS_SERVICE);
+        log('✓ Service FTMS trouvé.', 'ok');
+        await setupFTMS(ftms);
 
         try {
           const hrs = await state.server.getPrimaryService(UUID.HRS_SERVICE);
@@ -391,29 +449,21 @@
           log('HR non dispo (normal sans ceinture).', 'info');
         }
 
+        state.connected = true;
         setStatus('Connecté à ' + (state.device.name || 'rameur'), 'connected');
-        setConnectedUI(true);
+        updateButtons();
 
       } catch (e) {
         log('Erreur connexion : ' + describeError(e), 'err');
         setStatus('Échec de connexion', '');
-        setConnectedUI(false);
+        state.connected = false;
+        updateButtons();
       }
     }
 
     async function setupFTMS(ftms) {
       const chars = await ftms.getCharacteristics();
       log('FTMS : ' + chars.length + ' caractéristique(s)', 'info');
-      for (let i = 0; i < chars.length; i++) {
-        const c = chars[i];
-        const props = [];
-        if (c.properties.read) props.push('read');
-        if (c.properties.notify) props.push('notify');
-        if (c.properties.write) props.push('write');
-        if (c.properties.writeWithoutResponse) props.push('writeNR');
-        if (c.properties.indicate) props.push('indicate');
-        log('  └─ ' + c.uuid + ' [' + props.join(',') + ']', 'info');
-      }
 
       try {
         const rowerData = await ftms.getCharacteristic(UUID.ROWER_DATA);
@@ -426,43 +476,90 @@
       }
 
       try {
-        const feat = await ftms.getCharacteristic(UUID.FITNESS_MACHINE_FEATURE);
-        const val = await feat.readValue();
-        log('Features hex : ' + bytesToHex(val), 'hex');
+        const cp = await ftms.getCharacteristic(UUID.CONTROL_POINT);
+        await cp.startNotifications();
+        cp.addEventListener('characteristicvaluechanged', handleControlPointResponse);
+        state.characteristics.controlPoint = cp;
+        log('✓ Control Point indications ON.', 'ok');
       } catch (e) {
-        log('Features : ' + describeError(e), 'warn');
+        log('Control Point : ' + describeError(e), 'warn');
       }
 
       try {
-        const cp = await ftms.getCharacteristic(UUID.CONTROL_POINT);
-        state.characteristics.controlPoint = cp;
-        log('✓ Control Point disponible.', 'ok');
+        const st = await ftms.getCharacteristic(UUID.FITNESS_MACHINE_STATUS);
+        await st.startNotifications();
+        st.addEventListener('characteristicvaluechanged', handleStatusNotification);
+        log('✓ Machine Status ON.', 'ok');
       } catch (e) {
-        log('Control Point indispo.', 'warn');
+        log('Machine Status non dispo.', 'info');
+      }
+
+      try {
+        const ts = await ftms.getCharacteristic(UUID.TRAINING_STATUS);
+        await ts.startNotifications();
+        ts.addEventListener('characteristicvaluechanged', handleTrainingStatusNotification);
+        log('✓ Training Status ON.', 'ok');
+      } catch (e) {
+        log('Training Status non dispo.', 'info');
+      }
+    }
+
+    async function startSession() {
+      log('▶ Démarrage de la session...', 'info');
+      try {
+        // Séquence FTMS standard pour démarrer
+        await sendCpCommand(FTMS_OPCODE.REQUEST_CONTROL);
+        await new Promise(function(r){ setTimeout(r, 300); });
+        await sendCpCommand(FTMS_OPCODE.RESET);
+        await new Promise(function(r){ setTimeout(r, 300); });
+        await sendCpCommand(FTMS_OPCODE.START_OR_RESUME);
+        state.sessionActive = true;
+        setStatus('Session en cours', 'running');
+        updateButtons();
+        log('✓ Commandes Start envoyées.', 'ok');
+      } catch (e) {
+        log('Erreur start : ' + describeError(e), 'err');
+      }
+    }
+
+    async function stopSession() {
+      log('■ Arrêt de la session...', 'info');
+      try {
+        await sendCpCommand(FTMS_OPCODE.STOP_OR_PAUSE, [0x01]); // 0x01 = stop
+        state.sessionActive = false;
+        setStatus('Session arrêtée', 'connected');
+        updateButtons();
+        log('✓ Stop envoyé.', 'ok');
+      } catch (e) {
+        log('Erreur stop : ' + describeError(e), 'err');
       }
     }
 
     function onDisconnected() {
       log('Déconnexion GATT.', 'warn');
       setStatus('Déconnecté', '');
-      setConnectedUI(false);
+      state.connected = false;
+      state.sessionActive = false;
       state.server = null;
       state.characteristics = {};
+      updateButtons();
     }
 
     async function disconnect() {
       if (state.device && state.device.gatt.connected) {
         state.device.gatt.disconnect();
       }
-      setConnectedUI(false);
+      state.connected = false;
+      state.sessionActive = false;
       setStatus('Non connecté', '');
       resetMetrics();
+      updateButtons();
       log('Déconnexion manuelle.', 'info');
     }
 
     // Init UI
     els['log'].textContent = '';
-    log('App initialisée. v0.1.2', 'info');
+    log('App initialisée. v0.1.3', 'info');
 
     if (!navigator.bluetooth) {
       log('⚠ navigator.bluetooth indisponible. Ouvre cette page dans Bluefy.', 'err');
@@ -475,10 +572,11 @@
 
     els['btn-connect'].addEventListener('click', connect);
     els['btn-disconnect'].addEventListener('click', disconnect);
+    els['btn-start'].addEventListener('click', startSession);
+    els['btn-stop'].addEventListener('click', stopSession);
     log('✓ Boutons activés.', 'ok');
   }
 
-  // Démarre uniquement quand le DOM est totalement prêt
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', init);
   } else {
