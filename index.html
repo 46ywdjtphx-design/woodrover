@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<title>Rameur Woodrover</title>
+<title>Rameur Woodrover - Test FTMS</title>
 <style>
   :root {
     --bg: #0f1115; --surface: #1a1d24; --surface-2: #232730;
@@ -13,7 +13,9 @@
     --accent: #4f8cff; --accent-dim: #1e3a6f;
     --success: #34d399; --success-dim: #064e3b;
     --danger: #f87171; --danger-dim: #7f1d1d;
-    --warning: #fbbf24; --border: #2a2e38;
+    --warning: #fbbf24; --warning-dim: #78350f;
+    --purple: #c084fc; --purple-dim: #4c1d95;
+    --border: #2a2e38;
     --radius: 10px;
   }
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
@@ -37,7 +39,6 @@
   .status-dot { width: 12px; height: 12px; border-radius: 50%; background: var(--danger); transition: background 0.3s; }
   .status-dot.connected { background: var(--success); }
   .status-dot.connecting { background: var(--warning); animation: pulse 1.2s infinite; }
-  .status-dot.running { background: var(--success); animation: pulse 1.2s infinite; }
   @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
   .btn-row { display: flex; gap: 10px; margin-bottom: 12px; }
   button {
@@ -57,6 +58,8 @@
   button.primary:active:not(:disabled) { background: #3b75db; }
   button.success { background: var(--success-dim); border-color: var(--success); color: var(--success); }
   button.danger  { background: var(--danger-dim); border-color: var(--danger); color: var(--danger); }
+  button.warning { background: var(--warning-dim); border-color: var(--warning); color: var(--warning); }
+  button.purple  { background: var(--purple-dim); border-color: var(--purple); color: var(--purple); }
   button.small { font-size: 13px; padding: 10px; }
   .metrics-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin: 16px 0 20px; }
   .metric { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px; }
@@ -69,6 +72,11 @@
   summary::-webkit-details-marker { display: none; }
   summary::after { content: "▾"; color: var(--text-muted); transition: transform 0.2s; }
   details[open] summary::after { transform: rotate(180deg); }
+  .test-section { background: var(--purple-dim); border: 1px solid var(--purple); border-radius: var(--radius); padding: 14px; margin-bottom: 12px; }
+  .test-title { font-size: 14px; font-weight: 600; color: var(--purple); margin: 0 0 10px; }
+  .test-btn-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin-bottom: 8px; }
+  .test-btn-grid button { font-size: 12px; padding: 8px 4px; }
+  .test-desc { font-size: 11px; color: var(--text-dim); margin: 4px 0 8px; }
   .log-controls { display: flex; gap: 8px; margin: 10px 0; }
   .log {
     font-family: ui-monospace, "SF Mono", Menlo, monospace;
@@ -105,34 +113,57 @@
     <button id="btn-disconnect" disabled>Déconnecter</button>
   </div>
 
-  <div class="btn-row">
-    <button class="success" id="btn-start" disabled>▶ Démarrer</button>
-    <button class="danger" id="btn-stop" disabled>■ Arrêter</button>
-  </div>
-
   <div class="metrics-grid">
     <div class="metric"><p class="metric-label">Cadence</p><p class="metric-value"><span id="m-spm">—</span><span class="metric-unit">spm</span></p></div>
     <div class="metric"><p class="metric-label">Puissance</p><p class="metric-value"><span id="m-pwr">—</span><span class="metric-unit">W</span></p></div>
     <div class="metric"><p class="metric-label">Allure /500m</p><p class="metric-value" id="m-pace">—</p></div>
-    <div class="metric"><p class="metric-label">Vitesse</p><p class="metric-value"><span id="m-speed">—</span><span class="metric-unit">km/h</span></p></div>
-    <div class="metric"><p class="metric-label">Distance</p><p class="metric-value"><span id="m-dist">—</span><span class="metric-unit">m</span></p></div>
-    <div class="metric"><p class="metric-label">Temps</p><p class="metric-value" id="m-time">—</p></div>
-    <div class="metric"><p class="metric-label">Calories</p><p class="metric-value"><span id="m-cal">—</span><span class="metric-unit">kcal</span></p></div>
-    <div class="metric"><p class="metric-label">Résistance</p><p class="metric-value" id="m-res">—</p></div>
-    <div class="metric wide"><p class="metric-label">Fréquence cardiaque</p><p class="metric-value"><span id="m-hr">—</span><span class="metric-unit">bpm</span></p></div>
+    <div class="metric"><p class="metric-label">Résistance lue</p><p class="metric-value" id="m-res">—</p></div>
+  </div>
+
+  <div class="test-section">
+    <p class="test-title">⚙ Panneau de test FTMS</p>
+    <p class="test-desc">Cible : voir quelles commandes ton rameur accepte. Avant chaque test, taper "Request Control" pour reprendre le contrôle.</p>
+
+    <p class="test-desc" style="margin-top:12px; color:var(--text);">Initialisation</p>
+    <div class="test-btn-grid">
+      <button class="warning" id="t-rc">Request Control</button>
+      <button class="warning" id="t-reset">Reset</button>
+      <button class="warning" id="t-start">Start</button>
+    </div>
+
+    <p class="test-desc" style="margin-top:12px; color:var(--text);">Set Target Resistance (op 0x04) — niveau</p>
+    <div class="test-btn-grid">
+      <button class="success small" id="t-r1">Niv 1</button>
+      <button class="success small" id="t-r5">Niv 5</button>
+      <button class="success small" id="t-r10">Niv 10</button>
+    </div>
+
+    <p class="test-desc" style="margin-top:12px; color:var(--text);">Set Target Power (op 0x05) — watts</p>
+    <div class="test-btn-grid">
+      <button class="success small" id="t-p50">50 W</button>
+      <button class="success small" id="t-p100">100 W</button>
+      <button class="success small" id="t-p200">200 W</button>
+    </div>
+
+    <p class="test-desc" style="margin-top:12px; color:var(--text);">Autres essais</p>
+    <div class="test-btn-grid">
+      <button class="purple small" id="t-spd">Set Speed</button>
+      <button class="purple small" id="t-inc">Set Inclination</button>
+      <button class="purple small" id="t-sim">Set Sim Param</button>
+    </div>
   </div>
 
   <details open>
     <summary>Console diagnostic BLE</summary>
     <div class="log-controls">
-      <button class="small" id="btn-pause">⏸ Pause logs</button>
+      <button class="small" id="btn-pause">⏸ Pause</button>
       <button class="small" id="btn-clear">🗑 Effacer</button>
       <button class="small" id="btn-copy">📋 Copier</button>
     </div>
     <div class="log" id="log">Chargement...</div>
   </details>
 
-  <div class="footer">Rameur App · v0.1.4</div>
+  <div class="footer">Rameur App · v0.1.5 (test FTMS)</div>
 </div>
 
 <script>
@@ -145,7 +176,7 @@
       if (logEl) {
         const line = document.createElement('div');
         line.style.color = '#f87171';
-        line.textContent = '⚠ JS Error: ' + ev.message + ' @ ' + (ev.filename || '?') + ':' + ev.lineno;
+        line.textContent = '⚠ JS Error: ' + ev.message;
         logEl.appendChild(line);
       }
     } catch(e) {}
@@ -159,18 +190,30 @@
       FITNESS_MACHINE_STATUS:  '00002ada-0000-1000-8000-00805f9b34fb',
       CONTROL_POINT:           '00002ad9-0000-1000-8000-00805f9b34fb',
       TRAINING_STATUS:         '00002ad3-0000-1000-8000-00805f9b34fb',
-      HRS_SERVICE:             '0000180d-0000-1000-8000-00805f9b34fb',
-      HRM_CHARACTERISTIC:      '00002a37-0000-1000-8000-00805f9b34fb',
     };
 
-    const FTMS_OPCODE = {
-      REQUEST_CONTROL: 0x00, RESET: 0x01,
-      SET_TARGET_RESISTANCE: 0x04, SET_TARGET_POWER: 0x05,
-      START_OR_RESUME: 0x07, STOP_OR_PAUSE: 0x08,
+    // Tous les opcodes FTMS Control Point
+    const OP = {
+      REQUEST_CONTROL: 0x00,
+      RESET: 0x01,
+      SET_TARGET_SPEED: 0x02,
+      SET_TARGET_INCLINATION: 0x03,
+      SET_TARGET_RESISTANCE: 0x04,
+      SET_TARGET_POWER: 0x05,
+      SET_TARGET_HR: 0x06,
+      START_OR_RESUME: 0x07,
+      STOP_OR_PAUSE: 0x08,
+      SET_TARGETED_EXPENDED_ENERGY: 0x09,
+      SET_TARGETED_STEPS: 0x0A,
+      SET_TARGETED_DISTANCE: 0x0C,
+      SET_TARGETED_TIME: 0x0D,
+      SET_INDOOR_BIKE_SIMULATION: 0x11,
+      SET_WHEEL_CIRCUMFERENCE: 0x12,
+      SPIN_DOWN_CONTROL: 0x13,
       RESPONSE_CODE: 0x80,
     };
 
-    const FTMS_RESULT = {
+    const RESULT = {
       0x01: 'Success',
       0x02: 'Op Code not supported',
       0x03: 'Invalid Parameter',
@@ -180,14 +223,17 @@
 
     const state = {
       device: null, server: null, characteristics: {},
-      connected: false, sessionActive: false,
-      lastData: {}, lastLogTime: 0, logsPaused: false,
+      connected: false, logsPaused: false,
+      lastData: {}, lastLogTime: 0,
     };
 
-    const ids = ['status','dot','btn-connect','btn-disconnect','btn-start','btn-stop',
+    const ids = ['status','dot','btn-connect','btn-disconnect',
+                 't-rc','t-reset','t-start',
+                 't-r1','t-r5','t-r10',
+                 't-p50','t-p100','t-p200',
+                 't-spd','t-inc','t-sim',
                  'btn-pause','btn-clear','btn-copy','log',
-                 'm-spm','m-pwr','m-pace','m-speed','m-dist','m-time',
-                 'm-cal','m-res','m-hr'];
+                 'm-spm','m-pwr','m-pace','m-res'];
     const els = {};
     const missing = [];
     for (let i = 0; i < ids.length; i++) {
@@ -195,13 +241,10 @@
       if (!el) missing.push(ids[i]);
       els[ids[i]] = el;
     }
-    if (missing.length > 0) {
-      alert('Erreur init : ' + missing.join(', '));
-      return;
-    }
+    if (missing.length > 0) { alert('Init err: ' + missing.join(', ')); return; }
 
     function log(msg, type) {
-      if (state.logsPaused) return; // ne rien ajouter si en pause
+      if (state.logsPaused) return;
       type = type || 'info';
       const ts = new Date().toLocaleTimeString('fr-FR', { hour12: false });
       const line = document.createElement('div');
@@ -217,293 +260,220 @@
       els['dot'].className = 'status-dot' + (dotClass ? ' ' + dotClass : '');
     }
 
-    function updateButtons() {
-      els['btn-connect'].disabled = state.connected;
-      els['btn-disconnect'].disabled = !state.connected;
-      const hasCp = !!state.characteristics.controlPoint;
-      els['btn-start'].disabled = !state.connected || !hasCp;
-      els['btn-stop'].disabled = !state.connected || !hasCp;
-    }
-
-    function resetMetrics() {
-      ['m-spm','m-pwr','m-speed','m-dist','m-cal','m-hr','m-res'].forEach(function(k){
-        els[k].textContent = '—';
-      });
-      els['m-pace'].textContent = '—';
-      els['m-time'].textContent = '—';
-    }
-
-    function fmtTime(seconds) {
-      if (!Number.isFinite(seconds)) return '—';
-      const h = Math.floor(seconds / 3600);
-      const m = Math.floor((seconds % 3600) / 60);
-      const s = Math.floor(seconds % 60);
-      if (h > 0) return h + ':' + String(m).padStart(2,'0') + ':' + String(s).padStart(2,'0');
-      return m + ':' + String(s).padStart(2,'0');
+    function fmtTime(s) {
+      if (!Number.isFinite(s)) return '—';
+      const m = Math.floor(s/60), sec = Math.floor(s%60);
+      return m + ':' + String(sec).padStart(2,'0');
     }
 
     function bytesToHex(dv) {
       const arr = [];
-      for (let i = 0; i < dv.byteLength; i++) {
-        arr.push(dv.getUint8(i).toString(16).padStart(2, '0'));
-      }
+      for (let i = 0; i < dv.byteLength; i++) arr.push(dv.getUint8(i).toString(16).padStart(2,'0'));
       return arr.join(' ');
     }
 
     function describeError(e) {
-      if (e === undefined) return 'undefined';
-      if (e === null) return 'null';
-      if (typeof e === 'string') return e;
+      if (!e) return 'undefined';
       const parts = [];
       if (e.name) parts.push(e.name);
       if (e.message) parts.push(e.message);
-      if (!parts.length) { try { parts.push(String(e)); } catch(_){} }
-      return parts.join(' — ') || 'erreur inconnue';
+      return parts.join(' — ') || String(e);
     }
 
     function parseRowerData(dv) {
       const flags = dv.getUint16(0, true);
       let offset = 2;
-      const data = {};
+      const d = {};
       const moreData = (flags & 0x0001) !== 0;
-      if (!moreData) {
-        if (offset + 1 <= dv.byteLength) { data.strokeRate = dv.getUint8(offset) * 0.5; offset += 1; }
-        if (offset + 2 <= dv.byteLength) { data.strokeCount = dv.getUint16(offset, true); offset += 2; }
-      }
-      if ((flags & 0x0002) && offset + 1 <= dv.byteLength) { data.avgStrokeRate = dv.getUint8(offset) * 0.5; offset += 1; }
+      if (!moreData && offset + 1 <= dv.byteLength) { d.strokeRate = dv.getUint8(offset) * 0.5; offset += 1; }
+      if (!moreData && offset + 2 <= dv.byteLength) { d.strokeCount = dv.getUint16(offset, true); offset += 2; }
+      if ((flags & 0x0002) && offset + 1 <= dv.byteLength) { d.avgStrokeRate = dv.getUint8(offset)*0.5; offset += 1; }
       if ((flags & 0x0004) && offset + 3 <= dv.byteLength) {
-        data.totalDistance = dv.getUint8(offset) | (dv.getUint8(offset+1) << 8) | (dv.getUint8(offset+2) << 16);
+        d.totalDistance = dv.getUint8(offset) | (dv.getUint8(offset+1)<<8) | (dv.getUint8(offset+2)<<16);
         offset += 3;
       }
-      if ((flags & 0x0008) && offset + 2 <= dv.byteLength) { data.instantPace = dv.getUint16(offset, true); offset += 2; }
-      if ((flags & 0x0010) && offset + 2 <= dv.byteLength) { data.avgPace = dv.getUint16(offset, true); offset += 2; }
-      if ((flags & 0x0020) && offset + 2 <= dv.byteLength) { data.instantPower = dv.getInt16(offset, true); offset += 2; }
-      if ((flags & 0x0040) && offset + 2 <= dv.byteLength) { data.avgPower = dv.getInt16(offset, true); offset += 2; }
-      if ((flags & 0x0080) && offset + 2 <= dv.byteLength) { data.resistance = dv.getInt16(offset, true); offset += 2; }
-      if ((flags & 0x0100)) {
-        if (offset + 2 <= dv.byteLength) { data.totalEnergy = dv.getUint16(offset, true); offset += 2; }
-        if (offset + 2 <= dv.byteLength) { data.energyPerHour = dv.getUint16(offset, true); offset += 2; }
-        if (offset + 1 <= dv.byteLength) { data.energyPerMinute = dv.getUint8(offset); offset += 1; }
-      }
-      if ((flags & 0x0200) && offset + 1 <= dv.byteLength) { data.heartRate = dv.getUint8(offset); offset += 1; }
-      if ((flags & 0x0400) && offset + 1 <= dv.byteLength) { data.metabolicEquivalent = dv.getUint8(offset) * 0.1; offset += 1; }
-      if ((flags & 0x0800) && offset + 2 <= dv.byteLength) { data.elapsedTime = dv.getUint16(offset, true); offset += 2; }
-      if ((flags & 0x1000) && offset + 2 <= dv.byteLength) { data.remainingTime = dv.getUint16(offset, true); offset += 2; }
-      return data;
+      if ((flags & 0x0008) && offset + 2 <= dv.byteLength) { d.instantPace = dv.getUint16(offset, true); offset += 2; }
+      if ((flags & 0x0010) && offset + 2 <= dv.byteLength) { d.avgPace = dv.getUint16(offset, true); offset += 2; }
+      if ((flags & 0x0020) && offset + 2 <= dv.byteLength) { d.instantPower = dv.getInt16(offset, true); offset += 2; }
+      if ((flags & 0x0040) && offset + 2 <= dv.byteLength) { d.avgPower = dv.getInt16(offset, true); offset += 2; }
+      if ((flags & 0x0080) && offset + 2 <= dv.byteLength) { d.resistance = dv.getInt16(offset, true); offset += 2; }
+      return d;
     }
 
-    function updateMetrics(d) {
-      Object.assign(state.lastData, d);
+    function updateMetrics() {
       const s = state.lastData;
       if (s.strokeRate !== undefined) els['m-spm'].textContent = Math.round(s.strokeRate);
       if (s.instantPower !== undefined) els['m-pwr'].textContent = s.instantPower;
-      if (s.totalDistance !== undefined) els['m-dist'].textContent = s.totalDistance;
-      if (s.totalEnergy !== undefined) els['m-cal'].textContent = s.totalEnergy;
-      if (s.heartRate !== undefined) els['m-hr'].textContent = s.heartRate;
-      if (s.elapsedTime !== undefined) els['m-time'].textContent = fmtTime(s.elapsedTime);
       if (s.resistance !== undefined) els['m-res'].textContent = s.resistance;
       if (s.instantPace !== undefined && s.instantPace > 0) {
-        const m = Math.floor(s.instantPace / 60);
-        const sec = Math.floor(s.instantPace % 60);
-        els['m-pace'].textContent = m + ':' + String(sec).padStart(2,'0');
-        els['m-speed'].textContent = ((500 / s.instantPace) * 3.6).toFixed(1);
+        els['m-pace'].textContent = fmtTime(s.instantPace);
       } else {
         els['m-pace'].textContent = '—';
-        els['m-speed'].textContent = '0';
       }
     }
 
     function handleRowerNotification(event) {
-      const dv = event.target.value;
       try {
-        const data = parseRowerData(dv);
-        updateMetrics(data);
-        // Anti-spam : ne logger que si quelque chose bouge OU toutes les 5 secondes
+        const d = parseRowerData(event.target.value);
+        Object.assign(state.lastData, d);
+        updateMetrics();
         const s = state.lastData;
-        const hasActivity = (s.strokeRate > 0) || (s.totalDistance > 0) || (s.elapsedTime > 0) || (s.instantPower > 0);
+        const active = (s.strokeRate>0) || (s.totalDistance>0) || (s.instantPower>0);
         const now = Date.now();
-        const interval = hasActivity ? 1500 : 5000;
+        const interval = active ? 2000 : 5000;
         if (now - state.lastLogTime > interval) {
           state.lastLogTime = now;
-          log('📊 cad=' + Math.round(s.strokeRate||0) + ' pwr=' + (s.instantPower||0)
-              + ' dist=' + (s.totalDistance||0) + 'm res=' + (s.resistance||0)
-              + ' t=' + fmtTime(s.elapsedTime||0) + (hasActivity ? '' : ' (idle)'), 'data');
+          log('📊 cad=' + Math.round(s.strokeRate||0) + ' pwr=' + (s.instantPower||0) + ' res=' + (s.resistance||0) + (active ? '' : ' (idle)'), 'data');
         }
       } catch (e) {
-        log('Parse error: ' + describeError(e), 'err');
+        log('Parse: ' + describeError(e), 'err');
       }
     }
 
-    function handleHrNotification(event) {
-      const dv = event.target.value;
-      const flags = dv.getUint8(0);
-      const is16 = (flags & 0x01) !== 0;
-      const hr = is16 ? dv.getUint16(1, true) : dv.getUint8(1);
-      state.lastData.heartRate = hr;
-      els['m-hr'].textContent = hr;
-    }
-
-    function handleControlPointResponse(event) {
+    function handleCpResponse(event) {
       const dv = event.target.value;
       const hex = bytesToHex(dv);
-      if (dv.byteLength >= 3 && dv.getUint8(0) === FTMS_OPCODE.RESPONSE_CODE) {
-        const reqOp = dv.getUint8(1);
-        const result = dv.getUint8(2);
-        const resultText = FTMS_RESULT[result] || ('Code 0x' + result.toString(16));
-        log('↩ CP réponse op=0x' + reqOp.toString(16).padStart(2,'0') + ' → ' + resultText + ' (raw: ' + hex + ')', result === 1 ? 'ok' : 'warn');
+      if (dv.byteLength >= 3 && dv.getUint8(0) === OP.RESPONSE_CODE) {
+        const op = dv.getUint8(1);
+        const r = dv.getUint8(2);
+        const txt = RESULT[r] || ('Code 0x' + r.toString(16));
+        const cls = r === 1 ? 'ok' : 'warn';
+        log('↩ CP op=0x' + op.toString(16).padStart(2,'0') + ' → ' + txt + (dv.byteLength > 3 ? ' (extra: ' + hex + ')' : ''), cls);
       } else {
-        log('↩ CP indication brute : ' + hex, 'cp');
+        log('↩ CP brut : ' + hex, 'cp');
       }
     }
 
-    function handleStatusNotification(event) {
-      log('📡 Machine Status: ' + bytesToHex(event.target.value), 'cp');
-    }
+    function handleStatus(event) { log('📡 Machine: ' + bytesToHex(event.target.value), 'cp'); }
+    function handleTraining(event) { log('🏋 Training: ' + bytesToHex(event.target.value), 'cp'); }
 
-    function handleTrainingStatusNotification(event) {
-      log('🏋 Training Status: ' + bytesToHex(event.target.value), 'cp');
-    }
-
-    async function sendCpCommand(opcode, params) {
+    // Envoie un opcode + params (array de bytes)
+    async function sendCp(opcode, params, label) {
       const cp = state.characteristics.controlPoint;
-      if (!cp) throw new Error('Control Point non disponible');
+      if (!cp) { log('Control Point absent', 'err'); return; }
       const arr = [opcode];
       if (params) for (let i = 0; i < params.length; i++) arr.push(params[i]);
       const buf = new Uint8Array(arr);
-      log('→ CP write : ' + Array.from(buf).map(function(b){return b.toString(16).padStart(2,'0');}).join(' '), 'cp');
-      await cp.writeValue(buf);
+      const hex = Array.from(buf).map(function(b){return b.toString(16).padStart(2,'0');}).join(' ');
+      log('→ ' + (label || ('op 0x' + opcode.toString(16))) + ' : ' + hex, 'cp');
+      try {
+        await cp.writeValue(buf);
+      } catch (e) {
+        log('  write error : ' + describeError(e), 'err');
+      }
     }
 
+    // Encode un sint16 little-endian
+    function int16LE(value) {
+      const v = value & 0xFFFF;
+      return [v & 0xFF, (v >> 8) & 0xFF];
+    }
+    function uint8(v) { return [v & 0xFF]; }
+
     async function connect() {
-      log('▶ Tap "Se connecter"', 'info');
-      if (!navigator.bluetooth) {
-        log('navigator.bluetooth indisponible.', 'err');
-        return;
-      }
+      log('▶ Connexion...', 'info');
       try {
-        setStatus('Recherche du rameur...', 'connecting');
+        setStatus('Recherche...', 'connecting');
         state.device = await navigator.bluetooth.requestDevice({
           filters: [{ services: [UUID.FTMS_SERVICE] }],
-          optionalServices: [UUID.FTMS_SERVICE, UUID.HRS_SERVICE],
+          optionalServices: [UUID.FTMS_SERVICE],
         });
         log('Sélectionné : ' + (state.device.name || '(sans nom)'), 'ok');
         state.device.addEventListener('gattserverdisconnected', onDisconnected);
-
-        setStatus('Connexion GATT...', 'connecting');
         state.server = await state.device.gatt.connect();
         log('GATT connecté.', 'ok');
 
         const ftms = await state.server.getPrimaryService(UUID.FTMS_SERVICE);
-        log('✓ Service FTMS.', 'ok');
-        await setupFTMS(ftms);
 
         try {
-          const hrs = await state.server.getPrimaryService(UUID.HRS_SERVICE);
-          const hrm = await hrs.getCharacteristic(UUID.HRM_CHARACTERISTIC);
-          await hrm.startNotifications();
-          hrm.addEventListener('characteristicvaluechanged', handleHrNotification);
-          log('✓ Heart Rate.', 'ok');
-        } catch (e) {
-          log('HR non dispo.', 'info');
-        }
+          const rd = await ftms.getCharacteristic(UUID.ROWER_DATA);
+          await rd.startNotifications();
+          rd.addEventListener('characteristicvaluechanged', handleRowerNotification);
+          log('✓ Rower Data ON.', 'ok');
+        } catch(e) { log('Rower Data : ' + describeError(e), 'err'); }
+
+        try {
+          const cp = await ftms.getCharacteristic(UUID.CONTROL_POINT);
+          await cp.startNotifications();
+          cp.addEventListener('characteristicvaluechanged', handleCpResponse);
+          state.characteristics.controlPoint = cp;
+          log('✓ Control Point ON.', 'ok');
+        } catch(e) { log('Control Point : ' + describeError(e), 'warn'); }
+
+        try {
+          const st = await ftms.getCharacteristic(UUID.FITNESS_MACHINE_STATUS);
+          await st.startNotifications();
+          st.addEventListener('characteristicvaluechanged', handleStatus);
+          log('✓ Status ON.', 'ok');
+        } catch(e) {}
+
+        try {
+          const ts = await ftms.getCharacteristic(UUID.TRAINING_STATUS);
+          await ts.startNotifications();
+          ts.addEventListener('characteristicvaluechanged', handleTraining);
+          log('✓ Training Status ON.', 'ok');
+        } catch(e) {}
+
+        // Lire Features (capacités déclarées)
+        try {
+          const feat = await ftms.getCharacteristic(UUID.FITNESS_MACHINE_FEATURE);
+          const v = await feat.readValue();
+          log('📋 Features : ' + bytesToHex(v), 'info');
+          // Parser les bits importants
+          if (v.byteLength >= 8) {
+            const fitnessFeatures = v.getUint32(0, true);
+            const targetSettingFeatures = v.getUint32(4, true);
+            log('  Fitness flags : 0x' + fitnessFeatures.toString(16).padStart(8,'0'), 'info');
+            log('  Target flags  : 0x' + targetSettingFeatures.toString(16).padStart(8,'0'), 'info');
+            // bits target setting (cf. FTMS spec)
+            const targets = [];
+            if (targetSettingFeatures & 0x01) targets.push('Speed');
+            if (targetSettingFeatures & 0x02) targets.push('Inclination');
+            if (targetSettingFeatures & 0x04) targets.push('Resistance');
+            if (targetSettingFeatures & 0x08) targets.push('Power');
+            if (targetSettingFeatures & 0x10) targets.push('HR');
+            if (targetSettingFeatures & 0x20) targets.push('TargetedEnergy');
+            if (targetSettingFeatures & 0x40) targets.push('TargetedSteps');
+            if (targetSettingFeatures & 0x80) targets.push('TargetedStrides');
+            if (targetSettingFeatures & 0x100) targets.push('TargetedDistance');
+            if (targetSettingFeatures & 0x200) targets.push('TargetedTime');
+            log('  Cibles supportées : ' + (targets.join(', ') || '(aucune)'), 'info');
+          }
+        } catch(e) { log('Features : ' + describeError(e), 'warn'); }
 
         state.connected = true;
-        setStatus('Connecté à ' + (state.device.name || 'rameur'), 'connected');
-        updateButtons();
+        setStatus('Connecté', 'connected');
+        els['btn-connect'].disabled = true;
+        els['btn-disconnect'].disabled = false;
       } catch (e) {
-        log('Erreur connexion : ' + describeError(e), 'err');
-        setStatus('Échec de connexion', '');
-        state.connected = false;
-        updateButtons();
-      }
-    }
-
-    async function setupFTMS(ftms) {
-      try {
-        const rowerData = await ftms.getCharacteristic(UUID.ROWER_DATA);
-        await rowerData.startNotifications();
-        rowerData.addEventListener('characteristicvaluechanged', handleRowerNotification);
-        state.characteristics.rowerData = rowerData;
-        log('✓ Rower Data ON.', 'ok');
-      } catch (e) {
-        log('Rower Data : ' + describeError(e), 'err');
-      }
-
-      try {
-        const cp = await ftms.getCharacteristic(UUID.CONTROL_POINT);
-        await cp.startNotifications();
-        cp.addEventListener('characteristicvaluechanged', handleControlPointResponse);
-        state.characteristics.controlPoint = cp;
-        log('✓ Control Point indications ON.', 'ok');
-      } catch (e) {
-        log('Control Point : ' + describeError(e), 'warn');
-      }
-
-      try {
-        const st = await ftms.getCharacteristic(UUID.FITNESS_MACHINE_STATUS);
-        await st.startNotifications();
-        st.addEventListener('characteristicvaluechanged', handleStatusNotification);
-        log('✓ Machine Status ON.', 'ok');
-      } catch (e) {}
-
-      try {
-        const ts = await ftms.getCharacteristic(UUID.TRAINING_STATUS);
-        await ts.startNotifications();
-        ts.addEventListener('characteristicvaluechanged', handleTrainingStatusNotification);
-        log('✓ Training Status ON.', 'ok');
-      } catch (e) {}
-    }
-
-    async function startSession() {
-      log('━━━ DÉMARRAGE SESSION ━━━', 'info');
-      try {
-        await sendCpCommand(FTMS_OPCODE.REQUEST_CONTROL);
-        await new Promise(function(r){ setTimeout(r, 500); });
-        await sendCpCommand(FTMS_OPCODE.RESET);
-        await new Promise(function(r){ setTimeout(r, 500); });
-        await sendCpCommand(FTMS_OPCODE.START_OR_RESUME);
-        state.sessionActive = true;
-        setStatus('Session en cours', 'running');
-      } catch (e) {
-        log('Erreur start : ' + describeError(e), 'err');
-      }
-    }
-
-    async function stopSession() {
-      log('━━━ ARRÊT SESSION ━━━', 'info');
-      try {
-        await sendCpCommand(FTMS_OPCODE.STOP_OR_PAUSE, [0x01]);
-        state.sessionActive = false;
-        setStatus('Session arrêtée', 'connected');
-      } catch (e) {
-        log('Erreur stop : ' + describeError(e), 'err');
+        log('Erreur : ' + describeError(e), 'err');
+        setStatus('Échec', '');
       }
     }
 
     function onDisconnected() {
-      log('Déconnexion GATT.', 'warn');
+      log('Déconnecté.', 'warn');
       setStatus('Déconnecté', '');
-      state.connected = false; state.sessionActive = false;
-      state.server = null; state.characteristics = {};
-      updateButtons();
+      state.connected = false;
+      state.server = null;
+      state.characteristics = {};
+      els['btn-connect'].disabled = false;
+      els['btn-disconnect'].disabled = true;
     }
 
     async function disconnect() {
       if (state.device && state.device.gatt.connected) state.device.gatt.disconnect();
-      state.connected = false; state.sessionActive = false;
       setStatus('Non connecté', '');
-      resetMetrics();
-      updateButtons();
-      log('Déconnexion manuelle.', 'info');
+      els['btn-connect'].disabled = false;
+      els['btn-disconnect'].disabled = true;
     }
 
     // Init UI
     els['log'].textContent = '';
-    log('App v0.1.4 initialisée.', 'info');
+    log('App v0.1.5 (test FTMS).', 'info');
     if (!navigator.bluetooth) {
       log('⚠ Utilise Bluefy.', 'err');
       els['btn-connect'].disabled = true;
-      setStatus('Bluefy requis', '');
     } else {
       log('✓ Prêt.', 'ok');
       setStatus('Non connecté', '');
@@ -511,36 +481,46 @@
 
     els['btn-connect'].addEventListener('click', connect);
     els['btn-disconnect'].addEventListener('click', disconnect);
-    els['btn-start'].addEventListener('click', startSession);
-    els['btn-stop'].addEventListener('click', stopSession);
 
-    // Contrôles des logs
-    els['btn-pause'].addEventListener('click', function() {
+    // Boutons de test
+    els['t-rc'].addEventListener('click', function(){ sendCp(OP.REQUEST_CONTROL, [], 'Request Control'); });
+    els['t-reset'].addEventListener('click', function(){ sendCp(OP.RESET, [], 'Reset'); });
+    els['t-start'].addEventListener('click', function(){ sendCp(OP.START_OR_RESUME, [], 'Start'); });
+
+    // Set Target Resistance : opcode 0x04, param = sint16 LE (niveau, multiplié par 0.1 selon spec mais en pratique souvent unité entière)
+    els['t-r1'].addEventListener('click',  function(){ sendCp(OP.SET_TARGET_RESISTANCE, int16LE(1),  'SetRes(1)'); });
+    els['t-r5'].addEventListener('click',  function(){ sendCp(OP.SET_TARGET_RESISTANCE, int16LE(5),  'SetRes(5)'); });
+    els['t-r10'].addEventListener('click', function(){ sendCp(OP.SET_TARGET_RESISTANCE, int16LE(10), 'SetRes(10)'); });
+
+    // Set Target Power : opcode 0x05, param = sint16 LE en watts
+    els['t-p50'].addEventListener('click',  function(){ sendCp(OP.SET_TARGET_POWER, int16LE(50),  'SetPwr(50W)'); });
+    els['t-p100'].addEventListener('click', function(){ sendCp(OP.SET_TARGET_POWER, int16LE(100), 'SetPwr(100W)'); });
+    els['t-p200'].addEventListener('click', function(){ sendCp(OP.SET_TARGET_POWER, int16LE(200), 'SetPwr(200W)'); });
+
+    // Set Target Speed : opcode 0x02, param = uint16 LE en 0.01 km/h (donc 1000 = 10 km/h)
+    els['t-spd'].addEventListener('click', function(){ sendCp(OP.SET_TARGET_SPEED, int16LE(1000), 'SetSpd(10km/h)'); });
+    // Set Target Inclination : opcode 0x03, param = sint16 LE en 0.1% (donc 50 = 5%)
+    els['t-inc'].addEventListener('click', function(){ sendCp(OP.SET_TARGET_INCLINATION, int16LE(50), 'SetInc(5%)'); });
+    // Set Indoor Bike Simulation : opcode 0x11, 6 octets (wind, grade, crr, cw)
+    els['t-sim'].addEventListener('click', function(){
+      // wind=0, grade=10 (1%), crr=0x33, cw=0x4C — paramètres typiques bike
+      sendCp(OP.SET_INDOOR_BIKE_SIMULATION, [0x00, 0x00, 0x0a, 0x00, 0x33, 0x4c], 'SetSimParam');
+    });
+
+    // Logs controls
+    els['btn-pause'].addEventListener('click', function(){
       state.logsPaused = !state.logsPaused;
-      els['btn-pause'].textContent = state.logsPaused ? '▶ Reprendre logs' : '⏸ Pause logs';
+      els['btn-pause'].textContent = state.logsPaused ? '▶ Reprendre' : '⏸ Pause';
       els['log'].classList.toggle('paused', state.logsPaused);
     });
-    els['btn-clear'].addEventListener('click', function() {
-      els['log'].textContent = '';
-    });
-    els['btn-copy'].addEventListener('click', function() {
+    els['btn-clear'].addEventListener('click', function(){ els['log'].textContent = ''; });
+    els['btn-copy'].addEventListener('click', function(){
       const text = els['log'].innerText;
       if (navigator.clipboard && navigator.clipboard.writeText) {
         navigator.clipboard.writeText(text).then(function() {
-          const orig = els['btn-copy'].textContent;
           els['btn-copy'].textContent = '✓ Copié !';
-          setTimeout(function(){ els['btn-copy'].textContent = orig; }, 1500);
-        }).catch(function() {
-          alert('Copie échouée. Sélectionne manuellement le texte de la console.');
-        });
-      } else {
-        // Fallback : sélectionne le texte
-        const range = document.createRange();
-        range.selectNode(els['log']);
-        const sel = window.getSelection();
-        sel.removeAllRanges();
-        sel.addRange(range);
-        alert('Texte sélectionné. Tape "Copier" dans le menu iOS.');
+          setTimeout(function(){ els['btn-copy'].textContent = '📋 Copier'; }, 1500);
+        }).catch(function() { alert('Copie échouée'); });
       }
     });
   }
