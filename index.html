@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<title>Rameur Woodrover - v1.8</title>
+<title>Rameur Woodrover - v1.9</title>
 <style>
   :root {
     --bg: #0f1115; --surface: #1a1d24; --surface-2: #232730;
@@ -15,6 +15,7 @@
     --danger: #f87171; --danger-dim: #7f1d1d;
     --warning: #fbbf24; --warning-dim: #78350f;
     --purple: #c084fc; --purple-dim: #4c1d95;
+    --pink: #f472b6; --pink-dim: #831843;
     --border: #2a2e38;
     --radius: 10px;
   }
@@ -52,11 +53,11 @@
   button:active:not(:disabled) { transform: scale(0.97); background: var(--surface-2); }
   button:disabled { opacity: 0.4; cursor: not-allowed; }
   button.primary { background: var(--accent); border-color: var(--accent); color: white; }
-  button.primary:active:not(:disabled) { background: #3b75db; }
   button.success { background: var(--success-dim); border-color: var(--success); color: var(--success); }
   button.warning { background: var(--warning-dim); border-color: var(--warning); color: var(--warning); }
   button.purple  { background: var(--purple-dim); border-color: var(--purple); color: var(--purple); }
-  button.small { font-size: 13px; padding: 10px; }
+  button.pink    { background: var(--pink-dim); border-color: var(--pink); color: var(--pink); }
+  button.small { font-size: 12px; padding: 9px 4px; }
   .metrics-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin: 16px 0 20px; }
   .metric { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px; }
   .metric-label { font-size: 12px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.04em; margin: 0 0 6px; }
@@ -68,6 +69,8 @@
   summary::after { content: "▾"; color: var(--text-muted); transition: transform 0.2s; }
   details[open] summary::after { transform: rotate(180deg); }
   .test-section { background: var(--purple-dim); border: 1px solid var(--purple); border-radius: var(--radius); padding: 14px; margin-bottom: 12px; }
+  .test-section.pink { background: var(--pink-dim); border-color: var(--pink); }
+  .test-section.pink .test-title { color: var(--pink); }
   .test-title { font-size: 14px; font-weight: 600; color: var(--purple); margin: 0 0 4px; }
   .test-desc { font-size: 11px; color: var(--text-dim); margin: 4px 0 8px; }
   .slider-row { display: flex; align-items: center; gap: 12px; margin: 8px 0; }
@@ -75,7 +78,14 @@
   .slider-row input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 24px; height: 24px; border-radius: 50%; background: var(--purple); cursor: pointer; }
   .slider-row .val { font-family: ui-monospace, monospace; font-size: 16px; color: var(--purple); min-width: 50px; text-align: right; font-weight: 600; }
   .test-btn-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin: 8px 0; }
-  .test-btn-grid button { font-size: 12px; padding: 10px 4px; }
+  .test-btn-grid.deux { grid-template-columns: repeat(2, 1fr); }
+  input[type="text"] {
+    width: 100%; padding: 10px 12px;
+    background: var(--bg); color: var(--text);
+    border: 1px solid var(--border); border-radius: 8px;
+    font-family: ui-monospace, monospace; font-size: 13px;
+    margin: 4px 0;
+  }
   .log-controls { display: flex; gap: 8px; margin: 10px 0; }
   .log {
     font-family: ui-monospace, "SF Mono", Menlo, monospace;
@@ -93,6 +103,7 @@
   .log .hex { color: #c084fc; }
   .log .data { color: #60a5fa; }
   .log .cp { color: #fbbf24; }
+  .log .custom { color: #f472b6; }
   .footer { text-align: center; font-size: 11px; color: var(--text-muted); padding: 20px 0 10px; }
 </style>
 </head>
@@ -121,37 +132,55 @@
 
   <div class="test-section">
     <p class="test-title">⚙ Pilotage résistance (1 → 15)</p>
-    <p class="test-desc">Slider niveau 1 à 15. La séquence (Request Control + SetRes) est automatique à la connexion.</p>
     <div class="slider-row">
       <input type="range" id="res-slider" min="1" max="15" step="1" value="5">
       <span class="val" id="res-val">5</span>
     </div>
     <div class="btn-row">
       <button class="success" id="t-send">Envoyer</button>
-      <button class="purple" id="t-reqctrl">Re-Request Control</button>
+      <button class="purple" id="t-reqctrl">Request Control</button>
     </div>
   </div>
 
-  <div class="test-section">
-    <p class="test-title">🔓 Sortir du mode "Connect your Rover"</p>
-    <p class="test-desc">Tests d'opcodes FTMS pour trouver lequel sort la machine de l'écran d'attente.</p>
-    <div class="test-btn-grid">
-      <button class="warning small" id="op-spd">SetSpeed</button>
-      <button class="warning small" id="op-time">SetTime(60s)</button>
-      <button class="warning small" id="op-dist">SetDist(500m)</button>
+  <div class="test-section pink">
+    <p class="test-title">🔓 Service 02F00000 (console "ntf_enable" suspecte)</p>
+    <p class="test-desc">FF01 = Write, FF02 = Read/Notify "ntf_enable". Hypothèse : Kynomap envoie une commande texte ici pour sortir du mode attente.</p>
+    <div class="test-btn-grid deux">
+      <button class="pink small" id="t-02f-ntfen">Write FF01 "ntf_enable"</button>
+      <button class="pink small" id="t-02f-start">Write FF01 "start"</button>
     </div>
-    <div class="test-btn-grid">
-      <button class="warning small" id="op-energy">SetEnergy</button>
-      <button class="warning small" id="op-hr">SetHR(140)</button>
-      <button class="warning small" id="op-steps">SetSteps</button>
+    <div class="test-btn-grid deux">
+      <button class="pink small" id="t-02f-begin">Write FF01 "begin"</button>
+      <button class="pink small" id="t-02f-cmdstart">Write FF01 "cmd:start"</button>
     </div>
-  </div>
-
-  <div class="test-section">
-    <p class="test-title">🔍 Explorer tous les services BLE</p>
-    <p class="test-desc">Cherche s'il existe un service Domyos custom au-delà de FTMS standard.</p>
+    <div class="test-btn-grid deux">
+      <button class="pink small" id="t-02f-byte01">Write FF01 [0x01]</button>
+      <button class="pink small" id="t-02f-byte0101">Write FF01 [0x01 0x01]</button>
+    </div>
+    <input type="text" id="t-02f-custom-input" placeholder="texte ou hex (ex: hello / 01 02 03)">
     <div class="btn-row">
-      <button class="purple" id="t-scan">Scanner tous les services</button>
+      <button class="pink small" id="t-02f-custom-text">Envoyer texte</button>
+      <button class="pink small" id="t-02f-custom-hex">Envoyer hex</button>
+    </div>
+  </div>
+
+  <div class="test-section">
+    <p class="test-title">🔌 Service C884DE52 (ISSC Serial over BT)</p>
+    <p class="test-desc">Service propriétaire Decathlon. Canal "Serial over Bluetooth" typique. À tester si 02F00000 ne marche pas.</p>
+    <input type="text" id="t-c88-input" placeholder="texte ou hex">
+    <div class="btn-row">
+      <button class="purple small" id="t-c88-text">Envoyer texte</button>
+      <button class="purple small" id="t-c88-hex">Envoyer hex</button>
+    </div>
+  </div>
+
+  <div class="test-section">
+    <p class="test-title">🔬 Service 04831523</p>
+    <p class="test-desc">Troisième service custom. Format inconnu.</p>
+    <input type="text" id="t-048-input" placeholder="texte ou hex">
+    <div class="btn-row">
+      <button class="purple small" id="t-048-text">Envoyer texte</button>
+      <button class="purple small" id="t-048-hex">Envoyer hex</button>
     </div>
   </div>
 
@@ -165,7 +194,7 @@
     <div class="log" id="log">Chargement...</div>
   </details>
 
-  <div class="footer">Rameur App · v0.1.8</div>
+  <div class="footer">Rameur App · v0.1.9</div>
 </div>
 
 <script>
@@ -185,29 +214,37 @@
   });
 
   function init() {
+    // UUIDs FTMS standard
     const UUID = {
       FTMS_SERVICE:                  '00001826-0000-1000-8000-00805f9b34fb',
       ROWER_DATA:                    '00002ad1-0000-1000-8000-00805f9b34fb',
-      FITNESS_MACHINE_FEATURE:       '00002acc-0000-1000-8000-00805f9b34fb',
-      FITNESS_MACHINE_STATUS:        '00002ada-0000-1000-8000-00805f9b34fb',
       CONTROL_POINT:                 '00002ad9-0000-1000-8000-00805f9b34fb',
+      FITNESS_MACHINE_STATUS:        '00002ada-0000-1000-8000-00805f9b34fb',
       TRAINING_STATUS:               '00002ad3-0000-1000-8000-00805f9b34fb',
-      SUPPORTED_RESISTANCE_RANGE:    '00002ad6-0000-1000-8000-00805f9b34fb',
+    };
+
+    // Services custom Domyos découverts via le scan
+    const CUSTOM = {
+      // Service C884DE52 - ISSC/Microchip Serial over BT
+      ISSC_SERVICE:   'c884de52-50c4-11ed-9020-00155d2f3ddc',
+      ISSC_WRITE:     '49535343-f917-11ec-b939-0242ac120002',
+      ISSC_NOTIFY:    '49535343-3f0b-11ed-9798-00155d6c6d38',
+      // Service 04831523
+      SVC_04831523_BASE: '04831523-6c9d-6ca9-5d41-03ad4fff4dfa',
+      SVC_04831525_WRITE: '04831525-6c9d-6ca9-5d41-03ad4fff4dfa',
+      SVC_04831524_NOTIFY: '04831524-6c9d-6ca9-5d41-03ad4fff4dfa',
+      // Service 02F00000 - console "ntf_enable"
+      SVC_02F_BASE:   '02f00000-0000-0000-0000-00000000fe00',
+      SVC_02F_FF00:   '02f00000-0000-0000-0000-00000000ff00', // R
+      SVC_02F_FF01:   '02f00000-0000-0000-0000-00000000ff01', // W, Wnr
+      SVC_02F_FF02:   '02f00000-0000-0000-0000-00000000ff02', // R, N
+      SVC_02F_FF03:   '02f00000-0000-0000-0000-00000000ff03', // R
     };
 
     const OP = {
       REQUEST_CONTROL: 0x00, RESET: 0x01,
-      SET_TARGET_SPEED: 0x02,
-      SET_TARGET_INCLINATION: 0x03,
       SET_TARGET_RESISTANCE: 0x04,
-      SET_TARGET_POWER: 0x05,
-      SET_TARGET_HR: 0x06,
       START_OR_RESUME: 0x07, STOP_OR_PAUSE: 0x08,
-      SET_TARGETED_EXPENDED_ENERGY: 0x09,
-      SET_TARGETED_STEPS: 0x0A,
-      SET_TARGETED_STRIDES: 0x0B,
-      SET_TARGETED_DISTANCE: 0x0C,
-      SET_TARGETED_TIME: 0x0D,
       RESPONSE_CODE: 0x80,
     };
 
@@ -217,23 +254,32 @@
       0x05: 'Control Not Permitted',
     };
 
-    // Mapping niveau UI (1-15) → valeur brute uint8
-    // Empiriquement, on a vu que 11, 21, ..., 141 marchent. Donc niveau N → valeur 10*N + 1.
-    // Niveau 1 = 11, niveau 14 = 141. Pour niveau 15, on tente 151.
+    // Mapping niveau UI 1-15 → raw uint8
+    // Empiriquement : niveaux 11, 21, ..., 141 ont passé (= 14 valeurs)
+    // Plage déclarée : min=10, max=150, step=10 → 15 niveaux logiques
+    // Niveau 1 → raw 10 ou 11 ? niveau 15 → raw 150 ?
+    // On essaie : niveau N → raw N*10 (avec niveau 1 = 10, niveau 15 = 150)
     function levelToRaw(level) {
-      return 10 * level + 1;
+      return Math.max(10, Math.min(150, level * 10));
     }
 
     const state = {
-      device: null, server: null, characteristics: {},
+      device: null, server: null,
+      controlPoint: null,
+      issc: { write: null, notify: null },
+      svc04: { write: null, notify: null },
+      svc02f: { ff01: null, ff02: null },
       connected: false, logsPaused: false,
       lastData: {}, lastLogTime: 0,
     };
 
     const ids = ['status','dot','btn-connect','btn-disconnect',
                  'res-slider','res-val','t-send','t-reqctrl',
-                 'op-spd','op-time','op-dist','op-energy','op-hr','op-steps',
-                 't-scan',
+                 't-02f-ntfen','t-02f-start','t-02f-begin','t-02f-cmdstart',
+                 't-02f-byte01','t-02f-byte0101',
+                 't-02f-custom-input','t-02f-custom-text','t-02f-custom-hex',
+                 't-c88-input','t-c88-text','t-c88-hex',
+                 't-048-input','t-048-text','t-048-hex',
                  'btn-pause','btn-clear','btn-copy','log',
                  'm-spm','m-pwr','m-pace','m-res'];
     const els = {};
@@ -274,12 +320,37 @@
       return arr.join(' ');
     }
 
+    function bytesToAscii(dv) {
+      let s = '';
+      for (let i = 0; i < dv.byteLength; i++) {
+        const b = dv.getUint8(i);
+        s += (b >= 0x20 && b <= 0x7E) ? String.fromCharCode(b) : '.';
+      }
+      return s;
+    }
+
     function describeError(e) {
       if (!e) return 'undefined';
       const parts = [];
       if (e.name) parts.push(e.name);
       if (e.message) parts.push(e.message);
       return parts.join(' — ') || String(e);
+    }
+
+    function parseHexInput(str) {
+      // "01 02 ff" ou "0102ff" → [1, 2, 255]
+      const clean = str.replace(/[^0-9a-fA-F]/g, '');
+      const out = [];
+      for (let i = 0; i + 1 < clean.length; i += 2) {
+        out.push(parseInt(clean.substr(i, 2), 16));
+      }
+      return out;
+    }
+
+    function textToBytes(str) {
+      const out = [];
+      for (let i = 0; i < str.length; i++) out.push(str.charCodeAt(i) & 0xFF);
+      return out;
     }
 
     function parseRowerData(dv) {
@@ -299,15 +370,9 @@
       if ((flags & 0x0020) && offset + 2 <= dv.byteLength) { d.instantPower = dv.getInt16(offset, true); offset += 2; }
       if ((flags & 0x0040) && offset + 2 <= dv.byteLength) { d.avgPower = dv.getInt16(offset, true); offset += 2; }
       if ((flags & 0x0080) && offset + 2 <= dv.byteLength) {
-        // Résistance brute. On la convertit en niveau 1-15 si possible.
         const raw = dv.getInt16(offset, true);
         d.resistanceRaw = raw;
-        // Mapping inverse approximatif : raw 11 → 1, raw 141 → 14
-        if (raw >= 11 && raw <= 151) {
-          d.resistance = Math.round((raw - 1) / 10);
-        } else {
-          d.resistance = raw;
-        }
+        d.resistance = Math.round(raw / 10);
         offset += 2;
       }
       return d;
@@ -333,14 +398,12 @@
         const s = state.lastData;
         const active = (s.strokeRate>0)||(s.totalDistance>0)||(s.instantPower>0);
         const now = Date.now();
-        const interval = active ? 2000 : 8000;
+        const interval = active ? 2000 : 10000;
         if (now - state.lastLogTime > interval) {
           state.lastLogTime = now;
           log('📊 cad=' + Math.round(s.strokeRate||0) + ' pwr=' + (s.instantPower||0) + ' res=' + (s.resistance||0) + ' (raw=' + (s.resistanceRaw||0) + ')' + (active ? '' : ' (idle)'), 'data');
         }
-      } catch (e) {
-        log('Parse: ' + describeError(e), 'err');
-      }
+      } catch (e) {}
     }
 
     function handleCpResponse(event) {
@@ -357,33 +420,83 @@
       }
     }
 
-    function handleStatus(event) { log('📡 Machine: ' + bytesToHex(event.target.value), 'cp'); }
+    function handleStatus(event) { log('📡 FTMS Status: ' + bytesToHex(event.target.value), 'cp'); }
     function handleTraining(event) { log('🏋 Training: ' + bytesToHex(event.target.value), 'cp'); }
 
-    async function sendRaw(bytes, label) {
-      const cp = state.characteristics.controlPoint;
-      if (!cp) { log('CP absent', 'err'); return; }
+    function makeCustomHandler(label) {
+      return function(event) {
+        const dv = event.target.value;
+        log('💌 ' + label + ' : hex=' + bytesToHex(dv) + ' | ascii="' + bytesToAscii(dv) + '"', 'custom');
+      };
+    }
+
+    async function sendToCp(bytes, label) {
+      if (!state.controlPoint) { log('CP absent', 'err'); return; }
+      const buf = new Uint8Array(bytes);
+      log('→ CP ' + label + ' : ' + Array.from(buf).map(function(b){return b.toString(16).padStart(2,'0');}).join(' '), 'cp');
+      try { await state.controlPoint.writeValue(buf); }
+      catch (e) { log('  write err : ' + describeError(e), 'err'); }
+    }
+
+    async function writeChar(characteristic, bytes, label) {
+      if (!characteristic) { log(label + ' : caractéristique absente', 'err'); return; }
       const buf = new Uint8Array(bytes);
       const hex = Array.from(buf).map(function(b){return b.toString(16).padStart(2,'0');}).join(' ');
-      log('→ ' + label + ' : ' + hex + '  (' + bytes.length + 'B)', 'cp');
+      const asc = bytes.map(function(b){return (b>=0x20 && b<=0x7E) ? String.fromCharCode(b) : '.';}).join('');
+      log('✉ ' + label + ' : hex=' + hex + ' | "' + asc + '"', 'custom');
       try {
-        await cp.writeValue(buf);
+        // On essaie writeWithoutResponse en priorité (plus rapide pour les flux)
+        if (characteristic.properties.writeWithoutResponse) {
+          await characteristic.writeValueWithoutResponse(buf);
+        } else {
+          await characteristic.writeValue(buf);
+        }
       } catch (e) {
         log('  write err : ' + describeError(e), 'err');
       }
     }
 
-    function int16LE(v) { return [v & 0xFF, (v >> 8) & 0xFF]; }
-    function int24LE(v) { return [v & 0xFF, (v >> 8) & 0xFF, (v >> 16) & 0xFF]; }
-
     async function reqCtrl() {
-      await sendRaw([OP.REQUEST_CONTROL], 'Request Control');
+      await sendToCp([OP.REQUEST_CONTROL], 'Request Control');
       await new Promise(function(r){ setTimeout(r, 400); });
     }
 
     async function setResistanceLevel(level) {
       const raw = levelToRaw(level);
-      await sendRaw([OP.SET_TARGET_RESISTANCE, raw], 'SetRes niveau ' + level + ' (raw=' + raw + ')');
+      await sendToCp([OP.SET_TARGET_RESISTANCE, raw], 'SetRes niveau ' + level + ' (raw=' + raw + ')');
+    }
+
+    async function setupCustomService(svcUuid, charsConfig) {
+      // charsConfig : { name: { uuid, isWrite, isNotify } }
+      try {
+        const svc = await state.server.getPrimaryService(svcUuid);
+        const result = {};
+        for (const name in charsConfig) {
+          const cfg = charsConfig[name];
+          try {
+            const c = await svc.getCharacteristic(cfg.uuid);
+            result[name] = c;
+            if (cfg.isNotify && (c.properties.notify || c.properties.indicate)) {
+              await c.startNotifications();
+              c.addEventListener('characteristicvaluechanged', makeCustomHandler(name));
+              log('  ✓ ' + name + ' notify ON', 'ok');
+            }
+            // Lire la valeur si possible
+            if (c.properties.read) {
+              try {
+                const v = await c.readValue();
+                log('  📖 ' + name + ' lu : hex=' + bytesToHex(v) + ' | "' + bytesToAscii(v) + '"', 'custom');
+              } catch(_){}
+            }
+          } catch (e) {
+            log('  ✗ ' + name + ' : ' + describeError(e), 'warn');
+          }
+        }
+        return result;
+      } catch (e) {
+        log('Service ' + svcUuid.slice(0,8) + ' indispo : ' + describeError(e), 'warn');
+        return null;
+      }
     }
 
     async function connect() {
@@ -392,42 +505,74 @@
         setStatus('Recherche...', 'connecting');
         state.device = await navigator.bluetooth.requestDevice({
           filters: [{ services: [UUID.FTMS_SERVICE] }],
-          optionalServices: [UUID.FTMS_SERVICE],
+          // Critique : on doit déclarer TOUS les services qu'on veut utiliser, même custom
+          optionalServices: [
+            UUID.FTMS_SERVICE,
+            CUSTOM.ISSC_SERVICE,
+            CUSTOM.SVC_04831523_BASE,
+            CUSTOM.SVC_02F_BASE,
+          ],
         });
         log('Sélectionné : ' + (state.device.name || '(sans nom)'), 'ok');
         state.device.addEventListener('gattserverdisconnected', onDisconnected);
         state.server = await state.device.gatt.connect();
         log('GATT connecté.', 'ok');
 
+        // === FTMS ===
+        log('━━━ FTMS setup ━━━', 'info');
         const ftms = await state.server.getPrimaryService(UUID.FTMS_SERVICE);
-
         try {
           const rd = await ftms.getCharacteristic(UUID.ROWER_DATA);
           await rd.startNotifications();
           rd.addEventListener('characteristicvaluechanged', handleRowerNotification);
         } catch(e) {}
-
         try {
-          const cp = await ftms.getCharacteristic(UUID.CONTROL_POINT);
-          await cp.startNotifications();
-          cp.addEventListener('characteristicvaluechanged', handleCpResponse);
-          state.characteristics.controlPoint = cp;
-          log('✓ Control Point ON.', 'ok');
-        } catch(e) { log('CP : ' + describeError(e), 'warn'); }
-
+          state.controlPoint = await ftms.getCharacteristic(UUID.CONTROL_POINT);
+          await state.controlPoint.startNotifications();
+          state.controlPoint.addEventListener('characteristicvaluechanged', handleCpResponse);
+          log('  ✓ Control Point ON', 'ok');
+        } catch(e) { log('  CP : ' + describeError(e), 'warn'); }
         try {
           const st = await ftms.getCharacteristic(UUID.FITNESS_MACHINE_STATUS);
           await st.startNotifications();
           st.addEventListener('characteristicvaluechanged', handleStatus);
         } catch(e) {}
-
         try {
           const ts = await ftms.getCharacteristic(UUID.TRAINING_STATUS);
           await ts.startNotifications();
           ts.addEventListener('characteristicvaluechanged', handleTraining);
         } catch(e) {}
 
-        // Auto Request Control au démarrage
+        // === Service ISSC (C884DE52) ===
+        log('━━━ Service ISSC (C884DE52) ━━━', 'info');
+        const issc = await setupCustomService(CUSTOM.ISSC_SERVICE, {
+          'ISSC.write':  { uuid: CUSTOM.ISSC_WRITE,  isWrite: true },
+          'ISSC.notify': { uuid: CUSTOM.ISSC_NOTIFY, isNotify: true },
+        });
+        if (issc) { state.issc.write = issc['ISSC.write']; state.issc.notify = issc['ISSC.notify']; }
+
+        // === Service 04831523 ===
+        log('━━━ Service 04831523 ━━━', 'info');
+        const svc04 = await setupCustomService(CUSTOM.SVC_04831523_BASE, {
+          '048.write':  { uuid: CUSTOM.SVC_04831525_WRITE,  isWrite: true },
+          '048.notify': { uuid: CUSTOM.SVC_04831524_NOTIFY, isNotify: true },
+        });
+        if (svc04) { state.svc04.write = svc04['048.write']; state.svc04.notify = svc04['048.notify']; }
+
+        // === Service 02F00000 (console ntf_enable) ===
+        log('━━━ Service 02F00000 ━━━', 'info');
+        const svc02f = await setupCustomService(CUSTOM.SVC_02F_BASE, {
+          '02F.FF00.read':   { uuid: CUSTOM.SVC_02F_FF00 },
+          '02F.FF01.write':  { uuid: CUSTOM.SVC_02F_FF01, isWrite: true },
+          '02F.FF02.notify': { uuid: CUSTOM.SVC_02F_FF02, isNotify: true },
+          '02F.FF03.read':   { uuid: CUSTOM.SVC_02F_FF03 },
+        });
+        if (svc02f) {
+          state.svc02f.ff01 = svc02f['02F.FF01.write'];
+          state.svc02f.ff02 = svc02f['02F.FF02.notify'];
+        }
+
+        // Auto Request Control
         log('⏳ Auto Request Control...', 'info');
         await reqCtrl();
 
@@ -435,6 +580,7 @@
         setStatus('Connecté', 'connected');
         els['btn-connect'].disabled = true;
         els['btn-disconnect'].disabled = false;
+        log('━━━ PRÊT — observe maintenant les notifications custom ━━━', 'ok');
       } catch (e) {
         log('Erreur : ' + describeError(e), 'err');
         setStatus('Échec', '');
@@ -446,7 +592,10 @@
       setStatus('Déconnecté', '');
       state.connected = false;
       state.server = null;
-      state.characteristics = {};
+      state.controlPoint = null;
+      state.issc = { write: null, notify: null };
+      state.svc04 = { write: null, notify: null };
+      state.svc02f = { ff01: null, ff02: null };
       els['btn-connect'].disabled = false;
       els['btn-disconnect'].disabled = true;
     }
@@ -458,59 +607,9 @@
       els['btn-disconnect'].disabled = true;
     }
 
-    // SCAN COMPLET de tous les services exposés
-    async function scanAllServices() {
-      if (!state.server) { log('Non connecté', 'err'); return; }
-      log('━━━ SCAN COMPLET DES SERVICES ━━━', 'info');
-      try {
-        const services = await state.server.getPrimaryServices();
-        log('Nombre de services : ' + services.length, 'info');
-        for (let i = 0; i < services.length; i++) {
-          const svc = services[i];
-          log('▼ Service ' + svc.uuid, 'ok');
-          try {
-            const chars = await svc.getCharacteristics();
-            for (let j = 0; j < chars.length; j++) {
-              const c = chars[j];
-              const props = [];
-              if (c.properties.read) props.push('R');
-              if (c.properties.write) props.push('W');
-              if (c.properties.writeWithoutResponse) props.push('Wnr');
-              if (c.properties.notify) props.push('N');
-              if (c.properties.indicate) props.push('I');
-              let valHex = '';
-              if (c.properties.read) {
-                try {
-                  const v = await c.readValue();
-                  valHex = ' = [' + bytesToHex(v) + ']';
-                } catch(_) { valHex = ' (read err)'; }
-              }
-              log('  • ' + c.uuid + ' [' + props.join(',') + ']' + valHex, 'hex');
-
-              // Active notifications sur tout ce qui le supporte pour capturer
-              if (c.properties.notify || c.properties.indicate) {
-                try {
-                  await c.startNotifications();
-                  c.addEventListener('characteristicvaluechanged', function(ev){
-                    const shortUuid = c.uuid.slice(4,8);
-                    log('  📡 ' + shortUuid + ' → ' + bytesToHex(ev.target.value), 'hex');
-                  });
-                } catch(_) {}
-              }
-            }
-          } catch (e) {
-            log('  err chars : ' + describeError(e), 'err');
-          }
-        }
-        log('━━━ FIN SCAN ━━━', 'info');
-      } catch (e) {
-        log('Scan err : ' + describeError(e), 'err');
-      }
-    }
-
-    // Init UI
+    // === Init UI ===
     els['log'].textContent = '';
-    log('App v0.1.8.', 'info');
+    log('App v0.1.9.', 'info');
     if (!navigator.bluetooth) {
       log('⚠ Utilise Bluefy.', 'err');
       els['btn-connect'].disabled = true;
@@ -522,53 +621,66 @@
     els['btn-connect'].addEventListener('click', connect);
     els['btn-disconnect'].addEventListener('click', disconnect);
 
-    // Slider résistance
     els['res-slider'].addEventListener('input', function(){
       els['res-val'].textContent = els['res-slider'].value;
     });
     els['t-send'].addEventListener('click', function(){
-      const lvl = parseInt(els['res-slider'].value, 10);
-      setResistanceLevel(lvl);
+      setResistanceLevel(parseInt(els['res-slider'].value, 10));
     });
     els['t-reqctrl'].addEventListener('click', reqCtrl);
 
-    // Tests d'opcodes pour sortir du mode "Connect your Rover"
-    // Toutes les commandes envoient d'abord Request Control pour sécurité
-    els['op-spd'].addEventListener('click', async function(){
-      await reqCtrl();
-      // Set Target Speed : sint16 LE en 0.01 km/h → 1000 = 10 km/h
-      await sendRaw([OP.SET_TARGET_SPEED].concat(int16LE(1000)), 'SetTargetSpeed(10km/h)');
+    // === Service 02F00000 — boutons rapides ===
+    els['t-02f-ntfen'].addEventListener('click', function(){
+      writeChar(state.svc02f.ff01, textToBytes('ntf_enable'), '02F.FF01 "ntf_enable"');
     });
-    els['op-time'].addEventListener('click', async function(){
-      await reqCtrl();
-      // Set Targeted Training Time : uint16 LE en secondes
-      await sendRaw([OP.SET_TARGETED_TIME].concat(int16LE(60)), 'SetTargetedTime(60s)');
+    els['t-02f-start'].addEventListener('click', function(){
+      writeChar(state.svc02f.ff01, textToBytes('start'), '02F.FF01 "start"');
     });
-    els['op-dist'].addEventListener('click', async function(){
-      await reqCtrl();
-      // Set Targeted Distance : uint24 LE en mètres
-      await sendRaw([OP.SET_TARGETED_DISTANCE].concat(int24LE(500)), 'SetTargetedDistance(500m)');
+    els['t-02f-begin'].addEventListener('click', function(){
+      writeChar(state.svc02f.ff01, textToBytes('begin'), '02F.FF01 "begin"');
     });
-    els['op-energy'].addEventListener('click', async function(){
-      await reqCtrl();
-      // Set Targeted Expended Energy : uint16 LE en calories
-      await sendRaw([OP.SET_TARGETED_EXPENDED_ENERGY].concat(int16LE(100)), 'SetTargetedEnergy(100kcal)');
+    els['t-02f-cmdstart'].addEventListener('click', function(){
+      writeChar(state.svc02f.ff01, textToBytes('cmd:start'), '02F.FF01 "cmd:start"');
     });
-    els['op-hr'].addEventListener('click', async function(){
-      await reqCtrl();
-      // Set Target Heart Rate : uint8 en bpm
-      await sendRaw([OP.SET_TARGET_HR, 140], 'SetTargetHR(140bpm)');
+    els['t-02f-byte01'].addEventListener('click', function(){
+      writeChar(state.svc02f.ff01, [0x01], '02F.FF01 [0x01]');
     });
-    els['op-steps'].addEventListener('click', async function(){
-      await reqCtrl();
-      // Set Targeted Number of Steps : uint16 LE
-      await sendRaw([OP.SET_TARGETED_STEPS].concat(int16LE(1000)), 'SetTargetedSteps(1000)');
+    els['t-02f-byte0101'].addEventListener('click', function(){
+      writeChar(state.svc02f.ff01, [0x01, 0x01], '02F.FF01 [0x01 0x01]');
+    });
+    els['t-02f-custom-text'].addEventListener('click', function(){
+      const v = els['t-02f-custom-input'].value;
+      if (v) writeChar(state.svc02f.ff01, textToBytes(v), '02F.FF01 "' + v + '"');
+    });
+    els['t-02f-custom-hex'].addEventListener('click', function(){
+      const v = els['t-02f-custom-input'].value;
+      const bytes = parseHexInput(v);
+      if (bytes.length) writeChar(state.svc02f.ff01, bytes, '02F.FF01 hex');
     });
 
-    // Scan complet
-    els['t-scan'].addEventListener('click', scanAllServices);
+    // === Service ISSC (C884DE52) ===
+    els['t-c88-text'].addEventListener('click', function(){
+      const v = els['t-c88-input'].value;
+      if (v) writeChar(state.issc.write, textToBytes(v), 'ISSC "' + v + '"');
+    });
+    els['t-c88-hex'].addEventListener('click', function(){
+      const v = els['t-c88-input'].value;
+      const bytes = parseHexInput(v);
+      if (bytes.length) writeChar(state.issc.write, bytes, 'ISSC hex');
+    });
 
-    // Logs
+    // === Service 04831523 ===
+    els['t-048-text'].addEventListener('click', function(){
+      const v = els['t-048-input'].value;
+      if (v) writeChar(state.svc04.write, textToBytes(v), '048 "' + v + '"');
+    });
+    els['t-048-hex'].addEventListener('click', function(){
+      const v = els['t-048-input'].value;
+      const bytes = parseHexInput(v);
+      if (bytes.length) writeChar(state.svc04.write, bytes, '048 hex');
+    });
+
+    // === Logs ===
     els['btn-pause'].addEventListener('click', function(){
       state.logsPaused = !state.logsPaused;
       els['btn-pause'].textContent = state.logsPaused ? '▶ Reprendre' : '⏸ Pause';
