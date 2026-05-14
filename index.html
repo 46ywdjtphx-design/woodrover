@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<title>Rameur Woodrover - Test v1.7</title>
+<title>Rameur Woodrover - v1.8</title>
 <style>
   :root {
     --bg: #0f1115; --surface: #1a1d24; --surface-2: #232730;
@@ -70,13 +70,11 @@
   .test-section { background: var(--purple-dim); border: 1px solid var(--purple); border-radius: var(--radius); padding: 14px; margin-bottom: 12px; }
   .test-title { font-size: 14px; font-weight: 600; color: var(--purple); margin: 0 0 4px; }
   .test-desc { font-size: 11px; color: var(--text-dim); margin: 4px 0 8px; }
-  .range-info {
-    background: var(--bg); border-radius: 8px; padding: 10px; margin: 8px 0;
-    font-family: ui-monospace, monospace; font-size: 12px; color: var(--text-dim);
-  }
-  .range-info.found { color: var(--success); border: 1px solid var(--success); }
-  .test-btn-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 6px; margin: 8px 0; }
-  .test-btn-grid.tri { grid-template-columns: repeat(3, 1fr); }
+  .slider-row { display: flex; align-items: center; gap: 12px; margin: 8px 0; }
+  .slider-row input[type="range"] { flex: 1; -webkit-appearance: none; appearance: none; height: 4px; background: var(--surface); border-radius: 2px; outline: none; }
+  .slider-row input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 24px; height: 24px; border-radius: 50%; background: var(--purple); cursor: pointer; }
+  .slider-row .val { font-family: ui-monospace, monospace; font-size: 16px; color: var(--purple); min-width: 50px; text-align: right; font-weight: 600; }
+  .test-btn-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin: 8px 0; }
   .test-btn-grid button { font-size: 12px; padding: 10px 4px; }
   .log-controls { display: flex; gap: 8px; margin: 10px 0; }
   .log {
@@ -118,47 +116,42 @@
     <div class="metric"><p class="metric-label">Cadence</p><p class="metric-value"><span id="m-spm">—</span><span class="metric-unit">spm</span></p></div>
     <div class="metric"><p class="metric-label">Puissance</p><p class="metric-value"><span id="m-pwr">—</span><span class="metric-unit">W</span></p></div>
     <div class="metric"><p class="metric-label">Allure /500m</p><p class="metric-value" id="m-pace">—</p></div>
-    <div class="metric"><p class="metric-label">Résistance lue</p><p class="metric-value" id="m-res">—</p></div>
+    <div class="metric"><p class="metric-label">Résistance</p><p class="metric-value" id="m-res">—</p></div>
   </div>
 
   <div class="test-section">
-    <p class="test-title">⚙ Test multi-format SetRes</p>
-    <p class="test-desc">La plage déclarée est 10-150 step 10, mais aucune valeur sint16 LE n'est acceptée. Testons d'autres encodages.</p>
-
-    <div class="range-info" id="range-info">Connecte-toi pour lire la plage...</div>
-
-    <div class="test-btn-grid tri">
-      <button class="warning" id="t-rc">Request Control</button>
-      <button class="warning" id="t-reset">Reset</button>
-      <button class="warning" id="t-readres">Lire plages</button>
+    <p class="test-title">⚙ Pilotage résistance (1 → 15)</p>
+    <p class="test-desc">Slider niveau 1 à 15. La séquence (Request Control + SetRes) est automatique à la connexion.</p>
+    <div class="slider-row">
+      <input type="range" id="res-slider" min="1" max="15" step="1" value="5">
+      <span class="val" id="res-val">5</span>
     </div>
-
-    <p class="test-desc" style="margin-top:12px; color:var(--text); font-weight:600;">Format 1 : uint8 (1 octet seulement) — Hypothèse principale</p>
-    <div class="test-btn-grid tri">
-      <button class="success small" id="t-u8-10">u8: 10</button>
-      <button class="success small" id="t-u8-50">u8: 50</button>
-      <button class="success small" id="t-u8-100">u8: 100</button>
+    <div class="btn-row">
+      <button class="success" id="t-send">Envoyer</button>
+      <button class="purple" id="t-reqctrl">Re-Request Control</button>
     </div>
+  </div>
 
-    <p class="test-desc" style="margin-top:12px; color:var(--text); font-weight:600;">Format 2 : Index (1 = step 1, 5 = step 5)</p>
-    <div class="test-btn-grid tri">
-      <button class="success small" id="t-idx-1">u8 idx: 1</button>
-      <button class="success small" id="t-idx-5">u8 idx: 5</button>
-      <button class="success small" id="t-idx-15">u8 idx: 15</button>
+  <div class="test-section">
+    <p class="test-title">🔓 Sortir du mode "Connect your Rover"</p>
+    <p class="test-desc">Tests d'opcodes FTMS pour trouver lequel sort la machine de l'écran d'attente.</p>
+    <div class="test-btn-grid">
+      <button class="warning small" id="op-spd">SetSpeed</button>
+      <button class="warning small" id="op-time">SetTime(60s)</button>
+      <button class="warning small" id="op-dist">SetDist(500m)</button>
     </div>
-
-    <p class="test-desc" style="margin-top:12px; color:var(--text); font-weight:600;">Format 3 : sint16 BE (big-endian au lieu de little)</p>
-    <div class="test-btn-grid tri">
-      <button class="success small" id="t-be-10">be: 10</button>
-      <button class="success small" id="t-be-50">be: 50</button>
-      <button class="success small" id="t-be-100">be: 100</button>
+    <div class="test-btn-grid">
+      <button class="warning small" id="op-energy">SetEnergy</button>
+      <button class="warning small" id="op-hr">SetHR(140)</button>
+      <button class="warning small" id="op-steps">SetSteps</button>
     </div>
+  </div>
 
-    <p class="test-desc" style="margin-top:12px; color:var(--text); font-weight:600;">Test combiné (avec Reset avant)</p>
-    <div class="test-btn-grid tri">
-      <button class="purple small" id="t-combo-u8">Reset+u8(50)</button>
-      <button class="purple small" id="t-combo-le">Reset+le(50)</button>
-      <button class="purple small" id="t-sweep-u8">Sweep u8 1-150</button>
+  <div class="test-section">
+    <p class="test-title">🔍 Explorer tous les services BLE</p>
+    <p class="test-desc">Cherche s'il existe un service Domyos custom au-delà de FTMS standard.</p>
+    <div class="btn-row">
+      <button class="purple" id="t-scan">Scanner tous les services</button>
     </div>
   </div>
 
@@ -172,7 +165,7 @@
     <div class="log" id="log">Chargement...</div>
   </details>
 
-  <div class="footer">Rameur App · v0.1.7</div>
+  <div class="footer">Rameur App · v0.1.8</div>
 </div>
 
 <script>
@@ -200,13 +193,21 @@
       CONTROL_POINT:                 '00002ad9-0000-1000-8000-00805f9b34fb',
       TRAINING_STATUS:               '00002ad3-0000-1000-8000-00805f9b34fb',
       SUPPORTED_RESISTANCE_RANGE:    '00002ad6-0000-1000-8000-00805f9b34fb',
-      SUPPORTED_POWER_RANGE:         '00002ad8-0000-1000-8000-00805f9b34fb',
     };
 
     const OP = {
       REQUEST_CONTROL: 0x00, RESET: 0x01,
+      SET_TARGET_SPEED: 0x02,
+      SET_TARGET_INCLINATION: 0x03,
       SET_TARGET_RESISTANCE: 0x04,
+      SET_TARGET_POWER: 0x05,
+      SET_TARGET_HR: 0x06,
       START_OR_RESUME: 0x07, STOP_OR_PAUSE: 0x08,
+      SET_TARGETED_EXPENDED_ENERGY: 0x09,
+      SET_TARGETED_STEPS: 0x0A,
+      SET_TARGETED_STRIDES: 0x0B,
+      SET_TARGETED_DISTANCE: 0x0C,
+      SET_TARGETED_TIME: 0x0D,
       RESPONSE_CODE: 0x80,
     };
 
@@ -216,21 +217,23 @@
       0x05: 'Control Not Permitted',
     };
 
+    // Mapping niveau UI (1-15) → valeur brute uint8
+    // Empiriquement, on a vu que 11, 21, ..., 141 marchent. Donc niveau N → valeur 10*N + 1.
+    // Niveau 1 = 11, niveau 14 = 141. Pour niveau 15, on tente 151.
+    function levelToRaw(level) {
+      return 10 * level + 1;
+    }
+
     const state = {
       device: null, server: null, characteristics: {},
       connected: false, logsPaused: false,
       lastData: {}, lastLogTime: 0,
-      lastSentValue: null,
-      sweepRunning: false, sweepResults: [],
     };
 
     const ids = ['status','dot','btn-connect','btn-disconnect',
-                 't-rc','t-reset','t-readres',
-                 't-u8-10','t-u8-50','t-u8-100',
-                 't-idx-1','t-idx-5','t-idx-15',
-                 't-be-10','t-be-50','t-be-100',
-                 't-combo-u8','t-combo-le','t-sweep-u8',
-                 'range-info',
+                 'res-slider','res-val','t-send','t-reqctrl',
+                 'op-spd','op-time','op-dist','op-energy','op-hr','op-steps',
+                 't-scan',
                  'btn-pause','btn-clear','btn-copy','log',
                  'm-spm','m-pwr','m-pace','m-res'];
     const els = {};
@@ -251,7 +254,7 @@
       line.textContent = '[' + ts + '] ' + msg;
       els['log'].appendChild(line);
       els['log'].scrollTop = els['log'].scrollHeight;
-      while (els['log'].childElementCount > 400) els['log'].removeChild(els['log'].firstChild);
+      while (els['log'].childElementCount > 500) els['log'].removeChild(els['log'].firstChild);
     }
 
     function setStatus(text, dotClass) {
@@ -295,7 +298,18 @@
       if ((flags & 0x0010) && offset + 2 <= dv.byteLength) { d.avgPace = dv.getUint16(offset, true); offset += 2; }
       if ((flags & 0x0020) && offset + 2 <= dv.byteLength) { d.instantPower = dv.getInt16(offset, true); offset += 2; }
       if ((flags & 0x0040) && offset + 2 <= dv.byteLength) { d.avgPower = dv.getInt16(offset, true); offset += 2; }
-      if ((flags & 0x0080) && offset + 2 <= dv.byteLength) { d.resistance = dv.getInt16(offset, true); offset += 2; }
+      if ((flags & 0x0080) && offset + 2 <= dv.byteLength) {
+        // Résistance brute. On la convertit en niveau 1-15 si possible.
+        const raw = dv.getInt16(offset, true);
+        d.resistanceRaw = raw;
+        // Mapping inverse approximatif : raw 11 → 1, raw 141 → 14
+        if (raw >= 11 && raw <= 151) {
+          d.resistance = Math.round((raw - 1) / 10);
+        } else {
+          d.resistance = raw;
+        }
+        offset += 2;
+      }
       return d;
     }
 
@@ -322,7 +336,7 @@
         const interval = active ? 2000 : 8000;
         if (now - state.lastLogTime > interval) {
           state.lastLogTime = now;
-          log('📊 cad=' + Math.round(s.strokeRate||0) + ' pwr=' + (s.instantPower||0) + ' res=' + (s.resistance||0) + (active ? '' : ' (idle)'), 'data');
+          log('📊 cad=' + Math.round(s.strokeRate||0) + ' pwr=' + (s.instantPower||0) + ' res=' + (s.resistance||0) + ' (raw=' + (s.resistanceRaw||0) + ')' + (active ? '' : ' (idle)'), 'data');
         }
       } catch (e) {
         log('Parse: ' + describeError(e), 'err');
@@ -338,10 +352,6 @@
         const txt = RESULT[r] || ('Code 0x' + r.toString(16));
         const cls = r === 1 ? 'ok' : 'warn';
         log('↩ CP op=0x' + op.toString(16).padStart(2,'0') + ' → ' + txt, cls);
-        if (state.sweepRunning && op === OP.SET_TARGET_RESISTANCE && state.lastSentValue !== null) {
-          state.sweepResults.push({ value: state.lastSentValue, result: r, text: txt });
-          state.lastSentValue = null;
-        }
       } else {
         log('↩ CP brut : ' + hex, 'cp');
       }
@@ -350,18 +360,30 @@
     function handleStatus(event) { log('📡 Machine: ' + bytesToHex(event.target.value), 'cp'); }
     function handleTraining(event) { log('🏋 Training: ' + bytesToHex(event.target.value), 'cp'); }
 
-    // Envoi brut avec préfixe pour identifier le format
     async function sendRaw(bytes, label) {
       const cp = state.characteristics.controlPoint;
       if (!cp) { log('CP absent', 'err'); return; }
       const buf = new Uint8Array(bytes);
       const hex = Array.from(buf).map(function(b){return b.toString(16).padStart(2,'0');}).join(' ');
-      log('→ ' + label + ' : ' + hex + '  (' + bytes.length + ' octets)', 'cp');
+      log('→ ' + label + ' : ' + hex + '  (' + bytes.length + 'B)', 'cp');
       try {
         await cp.writeValue(buf);
       } catch (e) {
-        log('  write error : ' + describeError(e), 'err');
+        log('  write err : ' + describeError(e), 'err');
       }
+    }
+
+    function int16LE(v) { return [v & 0xFF, (v >> 8) & 0xFF]; }
+    function int24LE(v) { return [v & 0xFF, (v >> 8) & 0xFF, (v >> 16) & 0xFF]; }
+
+    async function reqCtrl() {
+      await sendRaw([OP.REQUEST_CONTROL], 'Request Control');
+      await new Promise(function(r){ setTimeout(r, 400); });
+    }
+
+    async function setResistanceLevel(level) {
+      const raw = levelToRaw(level);
+      await sendRaw([OP.SET_TARGET_RESISTANCE, raw], 'SetRes niveau ' + level + ' (raw=' + raw + ')');
     }
 
     async function connect() {
@@ -383,7 +405,6 @@
           const rd = await ftms.getCharacteristic(UUID.ROWER_DATA);
           await rd.startNotifications();
           rd.addEventListener('characteristicvaluechanged', handleRowerNotification);
-          log('✓ Rower Data ON.', 'ok');
         } catch(e) {}
 
         try {
@@ -392,7 +413,7 @@
           cp.addEventListener('characteristicvaluechanged', handleCpResponse);
           state.characteristics.controlPoint = cp;
           log('✓ Control Point ON.', 'ok');
-        } catch(e) { log('CP: ' + describeError(e), 'warn'); }
+        } catch(e) { log('CP : ' + describeError(e), 'warn'); }
 
         try {
           const st = await ftms.getCharacteristic(UUID.FITNESS_MACHINE_STATUS);
@@ -406,8 +427,9 @@
           ts.addEventListener('characteristicvaluechanged', handleTraining);
         } catch(e) {}
 
-        await readResistanceRange(ftms);
-        await readFeatures(ftms);
+        // Auto Request Control au démarrage
+        log('⏳ Auto Request Control...', 'info');
+        await reqCtrl();
 
         state.connected = true;
         setStatus('Connecté', 'connected');
@@ -417,46 +439,6 @@
         log('Erreur : ' + describeError(e), 'err');
         setStatus('Échec', '');
       }
-    }
-
-    async function readResistanceRange(ftms) {
-      try {
-        const c = await ftms.getCharacteristic(UUID.SUPPORTED_RESISTANCE_RANGE);
-        const v = await c.readValue();
-        log('📋 ResRange raw : ' + bytesToHex(v) + ' (' + v.byteLength + ' octets)', 'info');
-        if (v.byteLength >= 6) {
-          const min = v.getInt16(0, true);
-          const max = v.getInt16(2, true);
-          const inc = v.getUint16(4, true);
-          const msg = 'Plage : min=' + min + ', max=' + max + ', step=' + inc;
-          log('✓ ' + msg, 'ok');
-          els['range-info'].textContent = msg;
-          els['range-info'].classList.add('found');
-        }
-      } catch (e) {
-        log('ResRange : ' + describeError(e), 'warn');
-      }
-    }
-
-    async function readFeatures(ftms) {
-      try {
-        const feat = await ftms.getCharacteristic(UUID.FITNESS_MACHINE_FEATURE);
-        const v = await feat.readValue();
-        log('📋 Features hex : ' + bytesToHex(v), 'info');
-        if (v.byteLength >= 8) {
-          const fitness = v.getUint32(0, true);
-          const targets = v.getUint32(4, true);
-          log('  Fitness flags: 0x' + fitness.toString(16).padStart(8,'0'), 'info');
-          log('  Target flags : 0x' + targets.toString(16).padStart(8,'0'), 'info');
-          const list = [];
-          if (targets & 0x01) list.push('Speed');
-          if (targets & 0x02) list.push('Inclination');
-          if (targets & 0x04) list.push('Resistance');
-          if (targets & 0x08) list.push('Power');
-          if (targets & 0x10) list.push('HR');
-          log('  Targets supportées : ' + (list.join(', ') || '(aucune)'), 'info');
-        }
-      } catch(e) {}
     }
 
     function onDisconnected() {
@@ -476,34 +458,59 @@
       els['btn-disconnect'].disabled = true;
     }
 
-    // Helpers
-    async function reqCtrl() {
-      await sendRaw([OP.REQUEST_CONTROL], 'Request Control');
-      await new Promise(function(r){ setTimeout(r, 300); });
-    }
-    async function reset() {
-      await sendRaw([OP.RESET], 'Reset');
-      await new Promise(function(r){ setTimeout(r, 300); });
-    }
-    function int16LE(v) { return [v & 0xFF, (v >> 8) & 0xFF]; }
-    function int16BE(v) { return [(v >> 8) & 0xFF, v & 0xFF]; }
+    // SCAN COMPLET de tous les services exposés
+    async function scanAllServices() {
+      if (!state.server) { log('Non connecté', 'err'); return; }
+      log('━━━ SCAN COMPLET DES SERVICES ━━━', 'info');
+      try {
+        const services = await state.server.getPrimaryServices();
+        log('Nombre de services : ' + services.length, 'info');
+        for (let i = 0; i < services.length; i++) {
+          const svc = services[i];
+          log('▼ Service ' + svc.uuid, 'ok');
+          try {
+            const chars = await svc.getCharacteristics();
+            for (let j = 0; j < chars.length; j++) {
+              const c = chars[j];
+              const props = [];
+              if (c.properties.read) props.push('R');
+              if (c.properties.write) props.push('W');
+              if (c.properties.writeWithoutResponse) props.push('Wnr');
+              if (c.properties.notify) props.push('N');
+              if (c.properties.indicate) props.push('I');
+              let valHex = '';
+              if (c.properties.read) {
+                try {
+                  const v = await c.readValue();
+                  valHex = ' = [' + bytesToHex(v) + ']';
+                } catch(_) { valHex = ' (read err)'; }
+              }
+              log('  • ' + c.uuid + ' [' + props.join(',') + ']' + valHex, 'hex');
 
-    async function setResU8(value) {
-      state.lastSentValue = value;
-      await sendRaw([OP.SET_TARGET_RESISTANCE, value & 0xFF], 'SetRes_u8(' + value + ')');
-    }
-    async function setResLE(value) {
-      state.lastSentValue = value;
-      await sendRaw([OP.SET_TARGET_RESISTANCE].concat(int16LE(value)), 'SetRes_le(' + value + ')');
-    }
-    async function setResBE(value) {
-      state.lastSentValue = value;
-      await sendRaw([OP.SET_TARGET_RESISTANCE].concat(int16BE(value)), 'SetRes_be(' + value + ')');
+              // Active notifications sur tout ce qui le supporte pour capturer
+              if (c.properties.notify || c.properties.indicate) {
+                try {
+                  await c.startNotifications();
+                  c.addEventListener('characteristicvaluechanged', function(ev){
+                    const shortUuid = c.uuid.slice(4,8);
+                    log('  📡 ' + shortUuid + ' → ' + bytesToHex(ev.target.value), 'hex');
+                  });
+                } catch(_) {}
+              }
+            }
+          } catch (e) {
+            log('  err chars : ' + describeError(e), 'err');
+          }
+        }
+        log('━━━ FIN SCAN ━━━', 'info');
+      } catch (e) {
+        log('Scan err : ' + describeError(e), 'err');
+      }
     }
 
     // Init UI
     els['log'].textContent = '';
-    log('App v0.1.7 (test multi-format).', 'info');
+    log('App v0.1.8.', 'info');
     if (!navigator.bluetooth) {
       log('⚠ Utilise Bluefy.', 'err');
       els['btn-connect'].disabled = true;
@@ -515,74 +522,53 @@
     els['btn-connect'].addEventListener('click', connect);
     els['btn-disconnect'].addEventListener('click', disconnect);
 
-    els['t-rc'].addEventListener('click', reqCtrl);
-    els['t-reset'].addEventListener('click', reset);
-    els['t-readres'].addEventListener('click', async function(){
-      if (!state.server) { log('Non connecté', 'err'); return; }
-      try {
-        const ftms = await state.server.getPrimaryService(UUID.FTMS_SERVICE);
-        await readResistanceRange(ftms);
-        await readFeatures(ftms);
-      } catch(e) { log('Err: ' + describeError(e), 'err'); }
+    // Slider résistance
+    els['res-slider'].addEventListener('input', function(){
+      els['res-val'].textContent = els['res-slider'].value;
     });
+    els['t-send'].addEventListener('click', function(){
+      const lvl = parseInt(els['res-slider'].value, 10);
+      setResistanceLevel(lvl);
+    });
+    els['t-reqctrl'].addEventListener('click', reqCtrl);
 
-    // Format 1 : uint8
-    els['t-u8-10'].addEventListener('click',  function(){ setResU8(10); });
-    els['t-u8-50'].addEventListener('click',  function(){ setResU8(50); });
-    els['t-u8-100'].addEventListener('click', function(){ setResU8(100); });
-
-    // Format 2 : index (1, 5, 15 = step #1, #5, #15 = niveaux 10, 50, 150)
-    els['t-idx-1'].addEventListener('click',  function(){ setResU8(1); });
-    els['t-idx-5'].addEventListener('click',  function(){ setResU8(5); });
-    els['t-idx-15'].addEventListener('click', function(){ setResU8(15); });
-
-    // Format 3 : sint16 big-endian
-    els['t-be-10'].addEventListener('click',  function(){ setResBE(10); });
-    els['t-be-50'].addEventListener('click',  function(){ setResBE(50); });
-    els['t-be-100'].addEventListener('click', function(){ setResBE(100); });
-
-    // Combos
-    els['t-combo-u8'].addEventListener('click', async function(){
+    // Tests d'opcodes pour sortir du mode "Connect your Rover"
+    // Toutes les commandes envoient d'abord Request Control pour sécurité
+    els['op-spd'].addEventListener('click', async function(){
       await reqCtrl();
-      await reset();
-      await setResU8(50);
+      // Set Target Speed : sint16 LE en 0.01 km/h → 1000 = 10 km/h
+      await sendRaw([OP.SET_TARGET_SPEED].concat(int16LE(1000)), 'SetTargetSpeed(10km/h)');
     });
-    els['t-combo-le'].addEventListener('click', async function(){
+    els['op-time'].addEventListener('click', async function(){
       await reqCtrl();
-      await reset();
-      await setResLE(50);
+      // Set Targeted Training Time : uint16 LE en secondes
+      await sendRaw([OP.SET_TARGETED_TIME].concat(int16LE(60)), 'SetTargetedTime(60s)');
     });
-    els['t-sweep-u8'].addEventListener('click', async function(){
-      if (state.sweepRunning) return;
-      state.sweepRunning = true;
-      state.sweepResults = [];
-      log('━━━ SWEEP uint8 1-150 step 10 ━━━', 'info');
+    els['op-dist'].addEventListener('click', async function(){
       await reqCtrl();
-      const vals = [];
-      for (let v = 1; v <= 150; v += 10) vals.push(v);
-      for (let i = 0; i < vals.length; i++) {
-        await setResU8(vals[i]);
-        await new Promise(function(r){ setTimeout(r, 500); });
-      }
-      await new Promise(function(r){ setTimeout(r, 800); });
-      log('━━━ RÉSULTATS ━━━', 'info');
-      const ok = state.sweepResults.filter(function(r){ return r.result === 1; });
-      if (ok.length > 0) {
-        log('✓ ACCEPTÉES : ' + ok.map(function(r){return r.value;}).join(', '), 'ok');
-      } else {
-        log('✗ Aucune valeur acceptée.', 'err');
-        const grouped = {};
-        state.sweepResults.forEach(function(r){
-          grouped[r.text] = grouped[r.text] || [];
-          grouped[r.text].push(r.value);
-        });
-        Object.keys(grouped).forEach(function(k){
-          log('  · ' + k + ' : ' + grouped[k].join(', '), 'warn');
-        });
-      }
-      state.sweepRunning = false;
+      // Set Targeted Distance : uint24 LE en mètres
+      await sendRaw([OP.SET_TARGETED_DISTANCE].concat(int24LE(500)), 'SetTargetedDistance(500m)');
+    });
+    els['op-energy'].addEventListener('click', async function(){
+      await reqCtrl();
+      // Set Targeted Expended Energy : uint16 LE en calories
+      await sendRaw([OP.SET_TARGETED_EXPENDED_ENERGY].concat(int16LE(100)), 'SetTargetedEnergy(100kcal)');
+    });
+    els['op-hr'].addEventListener('click', async function(){
+      await reqCtrl();
+      // Set Target Heart Rate : uint8 en bpm
+      await sendRaw([OP.SET_TARGET_HR, 140], 'SetTargetHR(140bpm)');
+    });
+    els['op-steps'].addEventListener('click', async function(){
+      await reqCtrl();
+      // Set Targeted Number of Steps : uint16 LE
+      await sendRaw([OP.SET_TARGETED_STEPS].concat(int16LE(1000)), 'SetTargetedSteps(1000)');
     });
 
+    // Scan complet
+    els['t-scan'].addEventListener('click', scanAllServices);
+
+    // Logs
     els['btn-pause'].addEventListener('click', function(){
       state.logsPaused = !state.logsPaused;
       els['btn-pause'].textContent = state.logsPaused ? '▶ Reprendre' : '⏸ Pause';
