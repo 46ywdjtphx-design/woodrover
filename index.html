@@ -30,10 +30,7 @@
     padding: env(safe-area-inset-top, 16px) 16px env(safe-area-inset-bottom, 16px);
     padding-top: max(env(safe-area-inset-top), 16px);
   }
-  header {
-    display: flex; align-items: center; justify-content: space-between;
-    padding: 12px 0 16px;
-  }
+  header { display: flex; align-items: center; justify-content: space-between; padding: 12px 0 16px; }
   .title { font-size: 20px; font-weight: 600; margin: 0; }
   .subtitle { font-size: 13px; color: var(--text-dim); margin: 2px 0 0; }
   .status-dot { width: 12px; height: 12px; border-radius: 50%; background: var(--danger); transition: background 0.3s; }
@@ -66,17 +63,36 @@
   .metric-label { font-size: 12px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.04em; margin: 0 0 6px; }
   .metric-value { font-size: 26px; font-weight: 600; line-height: 1.1; font-variant-numeric: tabular-nums; }
   .metric-unit { font-size: 13px; color: var(--text-dim); font-weight: 400; margin-left: 4px; }
-  .metric.wide { grid-column: span 2; }
   details { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 12px 14px; margin-bottom: 12px; }
   summary { cursor: pointer; font-size: 14px; color: var(--text-dim); font-weight: 500; list-style: none; display: flex; justify-content: space-between; align-items: center; }
   summary::-webkit-details-marker { display: none; }
   summary::after { content: "▾"; color: var(--text-muted); transition: transform 0.2s; }
   details[open] summary::after { transform: rotate(180deg); }
   .test-section { background: var(--purple-dim); border: 1px solid var(--purple); border-radius: var(--radius); padding: 14px; margin-bottom: 12px; }
-  .test-title { font-size: 14px; font-weight: 600; color: var(--purple); margin: 0 0 10px; }
-  .test-btn-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin-bottom: 8px; }
-  .test-btn-grid button { font-size: 12px; padding: 8px 4px; }
+  .test-title { font-size: 14px; font-weight: 600; color: var(--purple); margin: 0 0 4px; }
   .test-desc { font-size: 11px; color: var(--text-dim); margin: 4px 0 8px; }
+  .range-info {
+    background: var(--bg); border-radius: 8px; padding: 10px; margin: 8px 0;
+    font-family: ui-monospace, monospace; font-size: 12px;
+    color: var(--text-dim);
+  }
+  .range-info.found { color: var(--success); border: 1px solid var(--success); }
+  .slider-row {
+    display: flex; align-items: center; gap: 12px; margin: 8px 0;
+  }
+  .slider-row input[type="range"] {
+    flex: 1; -webkit-appearance: none; appearance: none;
+    height: 4px; background: var(--surface); border-radius: 2px;
+    outline: none;
+  }
+  .slider-row input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none; appearance: none;
+    width: 24px; height: 24px; border-radius: 50%;
+    background: var(--purple); cursor: pointer;
+  }
+  .slider-row .val { font-family: ui-monospace, monospace; font-size: 14px; color: var(--purple); min-width: 60px; text-align: right; font-weight: 600; }
+  .test-btn-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin: 8px 0; }
+  .test-btn-grid button { font-size: 12px; padding: 8px 4px; }
   .log-controls { display: flex; gap: 8px; margin: 10px 0; }
   .log {
     font-family: ui-monospace, "SF Mono", Menlo, monospace;
@@ -121,35 +137,37 @@
   </div>
 
   <div class="test-section">
-    <p class="test-title">⚙ Panneau de test FTMS</p>
-    <p class="test-desc">Cible : voir quelles commandes ton rameur accepte. Avant chaque test, taper "Request Control" pour reprendre le contrôle.</p>
+    <p class="test-title">⚙ Test pilotage résistance</p>
+    <p class="test-desc">L'opcode 0x04 est supporté mais notre valeur "5" était invalide. Trouvons la bonne plage.</p>
 
-    <p class="test-desc" style="margin-top:12px; color:var(--text);">Initialisation</p>
+    <div class="range-info" id="range-info">Connecte-toi pour lire la plage supportée...</div>
+
+    <p class="test-desc" style="margin-top:12px; color:var(--text);">Setup (à faire avant tout test)</p>
     <div class="test-btn-grid">
       <button class="warning" id="t-rc">Request Control</button>
       <button class="warning" id="t-reset">Reset</button>
-      <button class="warning" id="t-start">Start</button>
+      <button class="warning" id="t-readres">Lire plage</button>
     </div>
 
-    <p class="test-desc" style="margin-top:12px; color:var(--text);">Set Target Resistance (op 0x04) — niveau</p>
+    <p class="test-desc" style="margin-top:12px; color:var(--text);">Valeur libre (slider)</p>
+    <div class="slider-row">
+      <input type="range" id="res-slider" min="0" max="200" step="1" value="10">
+      <span class="val" id="res-val">10</span>
+    </div>
     <div class="test-btn-grid">
-      <button class="success small" id="t-r1">Niv 1</button>
-      <button class="success small" id="t-r5">Niv 5</button>
-      <button class="success small" id="t-r10">Niv 10</button>
+      <button class="success" id="t-send-res">Envoyer SetRes</button>
+      <button class="purple" id="t-sweep">Test 0→100</button>
+      <button class="purple" id="t-sweep-big">Test 100→1000</button>
     </div>
 
-    <p class="test-desc" style="margin-top:12px; color:var(--text);">Set Target Power (op 0x05) — watts</p>
+    <p class="test-desc" style="margin-top:12px; color:var(--text);">Boutons rapides</p>
     <div class="test-btn-grid">
-      <button class="success small" id="t-p50">50 W</button>
-      <button class="success small" id="t-p100">100 W</button>
-      <button class="success small" id="t-p200">200 W</button>
-    </div>
-
-    <p class="test-desc" style="margin-top:12px; color:var(--text);">Autres essais</p>
-    <div class="test-btn-grid">
-      <button class="purple small" id="t-spd">Set Speed</button>
-      <button class="purple small" id="t-inc">Set Inclination</button>
-      <button class="purple small" id="t-sim">Set Sim Param</button>
+      <button class="success small" id="t-r0">SetRes(0)</button>
+      <button class="success small" id="t-r1">SetRes(1)</button>
+      <button class="success small" id="t-r10">SetRes(10)</button>
+      <button class="success small" id="t-r50">SetRes(50)</button>
+      <button class="success small" id="t-r100">SetRes(100)</button>
+      <button class="success small" id="t-r255">SetRes(255)</button>
     </div>
   </div>
 
@@ -163,7 +181,7 @@
     <div class="log" id="log">Chargement...</div>
   </details>
 
-  <div class="footer">Rameur App · v0.1.5 (test FTMS)</div>
+  <div class="footer">Rameur App · v0.1.6</div>
 </div>
 
 <script>
@@ -184,40 +202,30 @@
 
   function init() {
     const UUID = {
-      FTMS_SERVICE:            '00001826-0000-1000-8000-00805f9b34fb',
-      ROWER_DATA:              '00002ad1-0000-1000-8000-00805f9b34fb',
-      FITNESS_MACHINE_FEATURE: '00002acc-0000-1000-8000-00805f9b34fb',
-      FITNESS_MACHINE_STATUS:  '00002ada-0000-1000-8000-00805f9b34fb',
-      CONTROL_POINT:           '00002ad9-0000-1000-8000-00805f9b34fb',
-      TRAINING_STATUS:         '00002ad3-0000-1000-8000-00805f9b34fb',
+      FTMS_SERVICE:                  '00001826-0000-1000-8000-00805f9b34fb',
+      ROWER_DATA:                    '00002ad1-0000-1000-8000-00805f9b34fb',
+      FITNESS_MACHINE_FEATURE:       '00002acc-0000-1000-8000-00805f9b34fb',
+      FITNESS_MACHINE_STATUS:        '00002ada-0000-1000-8000-00805f9b34fb',
+      CONTROL_POINT:                 '00002ad9-0000-1000-8000-00805f9b34fb',
+      TRAINING_STATUS:               '00002ad3-0000-1000-8000-00805f9b34fb',
+      // Plages supportées (déclarées par la machine)
+      SUPPORTED_SPEED_RANGE:         '00002ad4-0000-1000-8000-00805f9b34fb',
+      SUPPORTED_INCLINATION_RANGE:   '00002ad5-0000-1000-8000-00805f9b34fb',
+      SUPPORTED_RESISTANCE_RANGE:    '00002ad6-0000-1000-8000-00805f9b34fb',
+      SUPPORTED_HEART_RATE_RANGE:    '00002ad7-0000-1000-8000-00805f9b34fb',
+      SUPPORTED_POWER_RANGE:         '00002ad8-0000-1000-8000-00805f9b34fb',
     };
 
-    // Tous les opcodes FTMS Control Point
     const OP = {
-      REQUEST_CONTROL: 0x00,
-      RESET: 0x01,
-      SET_TARGET_SPEED: 0x02,
-      SET_TARGET_INCLINATION: 0x03,
-      SET_TARGET_RESISTANCE: 0x04,
-      SET_TARGET_POWER: 0x05,
-      SET_TARGET_HR: 0x06,
-      START_OR_RESUME: 0x07,
-      STOP_OR_PAUSE: 0x08,
-      SET_TARGETED_EXPENDED_ENERGY: 0x09,
-      SET_TARGETED_STEPS: 0x0A,
-      SET_TARGETED_DISTANCE: 0x0C,
-      SET_TARGETED_TIME: 0x0D,
-      SET_INDOOR_BIKE_SIMULATION: 0x11,
-      SET_WHEEL_CIRCUMFERENCE: 0x12,
-      SPIN_DOWN_CONTROL: 0x13,
+      REQUEST_CONTROL: 0x00, RESET: 0x01,
+      SET_TARGET_RESISTANCE: 0x04, SET_TARGET_POWER: 0x05,
+      START_OR_RESUME: 0x07, STOP_OR_PAUSE: 0x08,
       RESPONSE_CODE: 0x80,
     };
 
     const RESULT = {
-      0x01: 'Success',
-      0x02: 'Op Code not supported',
-      0x03: 'Invalid Parameter',
-      0x04: 'Operation Failed',
+      0x01: 'Success', 0x02: 'Op Code not supported',
+      0x03: 'Invalid Parameter', 0x04: 'Operation Failed',
       0x05: 'Control Not Permitted',
     };
 
@@ -225,13 +233,18 @@
       device: null, server: null, characteristics: {},
       connected: false, logsPaused: false,
       lastData: {}, lastLogTime: 0,
+      resistanceRange: null,
+      // Suivi des commandes en cours pour test sweep
+      lastSentValue: null,
+      sweepRunning: false,
+      sweepResults: [],
     };
 
     const ids = ['status','dot','btn-connect','btn-disconnect',
-                 't-rc','t-reset','t-start',
-                 't-r1','t-r5','t-r10',
-                 't-p50','t-p100','t-p200',
-                 't-spd','t-inc','t-sim',
+                 't-rc','t-reset','t-readres',
+                 'res-slider','res-val','t-send-res','t-sweep','t-sweep-big',
+                 't-r0','t-r1','t-r10','t-r50','t-r100','t-r255',
+                 'range-info',
                  'btn-pause','btn-clear','btn-copy','log',
                  'm-spm','m-pwr','m-pace','m-res'];
     const els = {};
@@ -252,7 +265,7 @@
       line.textContent = '[' + ts + '] ' + msg;
       els['log'].appendChild(line);
       els['log'].scrollTop = els['log'].scrollHeight;
-      while (els['log'].childElementCount > 300) els['log'].removeChild(els['log'].firstChild);
+      while (els['log'].childElementCount > 400) els['log'].removeChild(els['log'].firstChild);
     }
 
     function setStatus(text, dotClass) {
@@ -338,7 +351,12 @@
         const r = dv.getUint8(2);
         const txt = RESULT[r] || ('Code 0x' + r.toString(16));
         const cls = r === 1 ? 'ok' : 'warn';
-        log('↩ CP op=0x' + op.toString(16).padStart(2,'0') + ' → ' + txt + (dv.byteLength > 3 ? ' (extra: ' + hex + ')' : ''), cls);
+        log('↩ CP op=0x' + op.toString(16).padStart(2,'0') + ' → ' + txt, cls);
+        // Si sweep en cours, on enregistre le résultat
+        if (state.sweepRunning && op === OP.SET_TARGET_RESISTANCE && state.lastSentValue !== null) {
+          state.sweepResults.push({ value: state.lastSentValue, result: r, text: txt });
+          state.lastSentValue = null;
+        }
       } else {
         log('↩ CP brut : ' + hex, 'cp');
       }
@@ -347,7 +365,6 @@
     function handleStatus(event) { log('📡 Machine: ' + bytesToHex(event.target.value), 'cp'); }
     function handleTraining(event) { log('🏋 Training: ' + bytesToHex(event.target.value), 'cp'); }
 
-    // Envoie un opcode + params (array de bytes)
     async function sendCp(opcode, params, label) {
       const cp = state.characteristics.controlPoint;
       if (!cp) { log('Control Point absent', 'err'); return; }
@@ -363,12 +380,15 @@
       }
     }
 
-    // Encode un sint16 little-endian
     function int16LE(value) {
       const v = value & 0xFFFF;
       return [v & 0xFF, (v >> 8) & 0xFF];
     }
-    function uint8(v) { return [v & 0xFF]; }
+
+    async function setResistance(value) {
+      state.lastSentValue = value;
+      await sendCp(OP.SET_TARGET_RESISTANCE, int16LE(value), 'SetRes(' + value + ')');
+    }
 
     async function connect() {
       log('▶ Connexion...', 'info');
@@ -404,42 +424,16 @@
           const st = await ftms.getCharacteristic(UUID.FITNESS_MACHINE_STATUS);
           await st.startNotifications();
           st.addEventListener('characteristicvaluechanged', handleStatus);
-          log('✓ Status ON.', 'ok');
         } catch(e) {}
 
         try {
           const ts = await ftms.getCharacteristic(UUID.TRAINING_STATUS);
           await ts.startNotifications();
           ts.addEventListener('characteristicvaluechanged', handleTraining);
-          log('✓ Training Status ON.', 'ok');
         } catch(e) {}
 
-        // Lire Features (capacités déclarées)
-        try {
-          const feat = await ftms.getCharacteristic(UUID.FITNESS_MACHINE_FEATURE);
-          const v = await feat.readValue();
-          log('📋 Features : ' + bytesToHex(v), 'info');
-          // Parser les bits importants
-          if (v.byteLength >= 8) {
-            const fitnessFeatures = v.getUint32(0, true);
-            const targetSettingFeatures = v.getUint32(4, true);
-            log('  Fitness flags : 0x' + fitnessFeatures.toString(16).padStart(8,'0'), 'info');
-            log('  Target flags  : 0x' + targetSettingFeatures.toString(16).padStart(8,'0'), 'info');
-            // bits target setting (cf. FTMS spec)
-            const targets = [];
-            if (targetSettingFeatures & 0x01) targets.push('Speed');
-            if (targetSettingFeatures & 0x02) targets.push('Inclination');
-            if (targetSettingFeatures & 0x04) targets.push('Resistance');
-            if (targetSettingFeatures & 0x08) targets.push('Power');
-            if (targetSettingFeatures & 0x10) targets.push('HR');
-            if (targetSettingFeatures & 0x20) targets.push('TargetedEnergy');
-            if (targetSettingFeatures & 0x40) targets.push('TargetedSteps');
-            if (targetSettingFeatures & 0x80) targets.push('TargetedStrides');
-            if (targetSettingFeatures & 0x100) targets.push('TargetedDistance');
-            if (targetSettingFeatures & 0x200) targets.push('TargetedTime');
-            log('  Cibles supportées : ' + (targets.join(', ') || '(aucune)'), 'info');
-          }
-        } catch(e) { log('Features : ' + describeError(e), 'warn'); }
+        // LECTURE CLÉ : plage de résistance supportée
+        await readResistanceRange(ftms);
 
         state.connected = true;
         setStatus('Connecté', 'connected');
@@ -449,6 +443,43 @@
         log('Erreur : ' + describeError(e), 'err');
         setStatus('Échec', '');
       }
+    }
+
+    async function readResistanceRange(ftms) {
+      try {
+        const c = await ftms.getCharacteristic(UUID.SUPPORTED_RESISTANCE_RANGE);
+        const v = await c.readValue();
+        log('📋 SupportedResistanceRange raw : ' + bytesToHex(v), 'info');
+        // Format : Minimum (sint16), Maximum (sint16), Minimum Increment (uint16)
+        if (v.byteLength >= 6) {
+          const min = v.getInt16(0, true);
+          const max = v.getInt16(2, true);
+          const inc = v.getUint16(4, true);
+          state.resistanceRange = { min: min, max: max, increment: inc };
+          const msg = '✓ Plage résistance : min=' + min + ', max=' + max + ', step=' + inc;
+          log(msg, 'ok');
+          els['range-info'].textContent = msg + '  ▶ Essaie des valeurs entre ' + min + ' et ' + max;
+          els['range-info'].classList.add('found');
+          // Ajuster le slider
+          els['res-slider'].min = min;
+          els['res-slider'].max = max;
+          els['res-slider'].step = inc || 1;
+          els['res-slider'].value = Math.min(max, Math.max(min, 10));
+          els['res-val'].textContent = els['res-slider'].value;
+        }
+      } catch (e) {
+        log('Plage résistance non disponible : ' + describeError(e), 'warn');
+        els['range-info'].textContent = 'Plage non déclarée par la machine (mais SetRes existe). On va tester en aveugle.';
+      }
+
+      // Lit aussi la plage power au cas où
+      try {
+        const c = await ftms.getCharacteristic(UUID.SUPPORTED_POWER_RANGE);
+        const v = await c.readValue();
+        if (v.byteLength >= 6) {
+          log('📋 PowerRange : min=' + v.getInt16(0,true) + ' max=' + v.getInt16(2,true) + ' step=' + v.getUint16(4,true), 'info');
+        }
+      } catch(e) {}
     }
 
     function onDisconnected() {
@@ -468,9 +499,49 @@
       els['btn-disconnect'].disabled = true;
     }
 
+    // Test exhaustif : essaie une liste de valeurs avec pause entre chaque
+    async function sweepValues(values, label) {
+      if (state.sweepRunning) { log('Sweep déjà en cours', 'warn'); return; }
+      state.sweepRunning = true;
+      state.sweepResults = [];
+      log('━━━ DÉBUT ' + label + ' (' + values.length + ' valeurs) ━━━', 'info');
+
+      // S'assurer qu'on a le contrôle d'abord
+      await sendCp(OP.REQUEST_CONTROL, [], 'Request Control');
+      await new Promise(function(r){ setTimeout(r, 400); });
+
+      for (let i = 0; i < values.length; i++) {
+        await setResistance(values[i]);
+        await new Promise(function(r){ setTimeout(r, 600); });
+      }
+
+      // Attendre les dernières réponses
+      await new Promise(function(r){ setTimeout(r, 800); });
+
+      // Synthèse
+      log('━━━ RÉSULTATS SWEEP ━━━', 'info');
+      const successes = state.sweepResults.filter(function(r){ return r.result === 1; });
+      if (successes.length > 0) {
+        log('✓ Valeurs ACCEPTÉES : ' + successes.map(function(r){ return r.value; }).join(', '), 'ok');
+      } else {
+        log('✗ Aucune valeur acceptée.', 'err');
+      }
+      const others = state.sweepResults.filter(function(r){ return r.result !== 1; });
+      const grouped = {};
+      others.forEach(function(r){
+        grouped[r.text] = grouped[r.text] || [];
+        grouped[r.text].push(r.value);
+      });
+      Object.keys(grouped).forEach(function(k){
+        log('  · ' + k + ' : ' + grouped[k].join(', '), 'warn');
+      });
+      log('━━━━━━━━━━━━━━━━━━━━', 'info');
+      state.sweepRunning = false;
+    }
+
     // Init UI
     els['log'].textContent = '';
-    log('App v0.1.5 (test FTMS).', 'info');
+    log('App v0.1.6 (test résistance).', 'info');
     if (!navigator.bluetooth) {
       log('⚠ Utilise Bluefy.', 'err');
       els['btn-connect'].disabled = true;
@@ -482,32 +553,43 @@
     els['btn-connect'].addEventListener('click', connect);
     els['btn-disconnect'].addEventListener('click', disconnect);
 
-    // Boutons de test
+    // Setup
     els['t-rc'].addEventListener('click', function(){ sendCp(OP.REQUEST_CONTROL, [], 'Request Control'); });
     els['t-reset'].addEventListener('click', function(){ sendCp(OP.RESET, [], 'Reset'); });
-    els['t-start'].addEventListener('click', function(){ sendCp(OP.START_OR_RESUME, [], 'Start'); });
-
-    // Set Target Resistance : opcode 0x04, param = sint16 LE (niveau, multiplié par 0.1 selon spec mais en pratique souvent unité entière)
-    els['t-r1'].addEventListener('click',  function(){ sendCp(OP.SET_TARGET_RESISTANCE, int16LE(1),  'SetRes(1)'); });
-    els['t-r5'].addEventListener('click',  function(){ sendCp(OP.SET_TARGET_RESISTANCE, int16LE(5),  'SetRes(5)'); });
-    els['t-r10'].addEventListener('click', function(){ sendCp(OP.SET_TARGET_RESISTANCE, int16LE(10), 'SetRes(10)'); });
-
-    // Set Target Power : opcode 0x05, param = sint16 LE en watts
-    els['t-p50'].addEventListener('click',  function(){ sendCp(OP.SET_TARGET_POWER, int16LE(50),  'SetPwr(50W)'); });
-    els['t-p100'].addEventListener('click', function(){ sendCp(OP.SET_TARGET_POWER, int16LE(100), 'SetPwr(100W)'); });
-    els['t-p200'].addEventListener('click', function(){ sendCp(OP.SET_TARGET_POWER, int16LE(200), 'SetPwr(200W)'); });
-
-    // Set Target Speed : opcode 0x02, param = uint16 LE en 0.01 km/h (donc 1000 = 10 km/h)
-    els['t-spd'].addEventListener('click', function(){ sendCp(OP.SET_TARGET_SPEED, int16LE(1000), 'SetSpd(10km/h)'); });
-    // Set Target Inclination : opcode 0x03, param = sint16 LE en 0.1% (donc 50 = 5%)
-    els['t-inc'].addEventListener('click', function(){ sendCp(OP.SET_TARGET_INCLINATION, int16LE(50), 'SetInc(5%)'); });
-    // Set Indoor Bike Simulation : opcode 0x11, 6 octets (wind, grade, crr, cw)
-    els['t-sim'].addEventListener('click', function(){
-      // wind=0, grade=10 (1%), crr=0x33, cw=0x4C — paramètres typiques bike
-      sendCp(OP.SET_INDOOR_BIKE_SIMULATION, [0x00, 0x00, 0x0a, 0x00, 0x33, 0x4c], 'SetSimParam');
+    els['t-readres'].addEventListener('click', async function(){
+      if (!state.server) { log('Pas connecté', 'err'); return; }
+      try {
+        const ftms = await state.server.getPrimaryService(UUID.FTMS_SERVICE);
+        await readResistanceRange(ftms);
+      } catch(e) { log('Erreur : ' + describeError(e), 'err'); }
     });
 
-    // Logs controls
+    // Slider
+    els['res-slider'].addEventListener('input', function(){
+      els['res-val'].textContent = els['res-slider'].value;
+    });
+    els['t-send-res'].addEventListener('click', function(){
+      const v = parseInt(els['res-slider'].value, 10);
+      setResistance(v);
+    });
+
+    // Sweeps
+    els['t-sweep'].addEventListener('click', function(){
+      sweepValues([0,1,2,3,5,10,15,20,30,50,75,100], 'Sweep 0→100');
+    });
+    els['t-sweep-big'].addEventListener('click', function(){
+      sweepValues([100,150,200,300,500,750,1000], 'Sweep 100→1000');
+    });
+
+    // Boutons rapides
+    els['t-r0'].addEventListener('click',   function(){ setResistance(0); });
+    els['t-r1'].addEventListener('click',   function(){ setResistance(1); });
+    els['t-r10'].addEventListener('click',  function(){ setResistance(10); });
+    els['t-r50'].addEventListener('click',  function(){ setResistance(50); });
+    els['t-r100'].addEventListener('click', function(){ setResistance(100); });
+    els['t-r255'].addEventListener('click', function(){ setResistance(255); });
+
+    // Logs
     els['btn-pause'].addEventListener('click', function(){
       state.logsPaused = !state.logsPaused;
       els['btn-pause'].textContent = state.logsPaused ? '▶ Reprendre' : '⏸ Pause';
