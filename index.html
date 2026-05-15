@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>Rameur Woodrover</title>
+<link rel="stylesheet" href="style.css">
+<style>
+  .landing {
+    max-width: 480px;
+    margin: 0 auto;
+    padding: max(env(safe-area-inset-top), 32px) 20px 24px;
+    text-align: center;
+  }
+  .landing h1 { font-size: 28px; margin: 0 0 6px; }
+  .landing .subtitle { color: var(--text-dim); font-size: 14px; margin-bottom: 32px; }
+  .landing .icon { font-size: 56px; margin-bottom: 16px; }
+  .choice {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 20px;
+    margin-bottom: 16px;
+    text-align: left;
+    cursor: pointer;
+    transition: border-color 0.15s, transform 0.05s;
+  }
+  .choice:hover { border-color: var(--accent); }
+  .choice:active { transform: scale(0.99); }
+  .choice h2 {
+    margin: 0 0 4px;
+    font-size: 18px;
+    display: flex; align-items: center; gap: 10px;
+  }
+  .choice h2 .badge {
+    font-size: 11px;
+    background: var(--accent-dim);
+    color: var(--accent);
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-weight: 500;
+  }
+  .choice p {
+    margin: 0;
+    color: var(--text-dim);
+    font-size: 13px;
+    line-height: 1.5;
+  }
+  .footer-note {
+    margin-top: 24px;
+    font-size: 12px;
+    color: var(--text-muted);
+    line-height: 1.5;
+  }
+</style>
+</head>
+<body>
+<div class="landing">
+  <div class="icon">🚣</div>
+  <h1>Rameur Woodrover</h1>
+  <p class="subtitle">Application personnelle de pilotage</p>
+
+  <a class="choice" id="link-player" href="player.html">
+    <h2>📱 Lecteur <span class="badge" id="badge-player">Mobile</span></h2>
+    <p>Connecte ton rameur, lance un entraînement et pilote la résistance bloc par bloc. Conçu pour Bluefy sur iPhone.</p>
+  </a>
+
+  <a class="choice" id="link-editor" href="editor.html">
+    <h2>💻 Éditeur <span class="badge" id="badge-editor">Desktop</span></h2>
+    <p>Crée et organise tes entraînements (blocs de durée + intensité). Conçu pour ordinateur, avec drag &amp; drop des blocs.</p>
+  </a>
+
+  <p class="footer-note" id="footer-note"></p>
+</div>
+
+<script src="app.js"></script>
+<script>
+(function() {
+  const isMobile = RameurApp.Utils.isMobile();
+  const isIPhone = RameurApp.Utils.isIPhone();
+  const hasBT = !!navigator.bluetooth;
+
+  const note = document.getElementById('footer-note');
+  const lines = [];
+
+  if (isIPhone) {
+    if (hasBT) {
+      lines.push('✓ Web Bluetooth détecté (tu sembles être dans Bluefy).');
+    } else {
+      lines.push('⚠ Sur iPhone, utilise le navigateur <b>Bluefy</b> (App Store) pour que le lecteur fonctionne.');
+    }
+  } else if (isMobile) {
+    if (hasBT) {
+      lines.push('✓ Web Bluetooth détecté.');
+    } else {
+      lines.push('⚠ Web Bluetooth non disponible dans ce navigateur.');
+    }
+  } else {
+    lines.push('Ordinateur détecté — l\'éditeur est tout indiqué.');
+    if (hasBT) {
+      lines.push('Bluetooth disponible : tu peux aussi tester le lecteur ici.');
+    }
+  }
+  note.innerHTML = lines.join('<br>');
+
+  // Si mobile, met l'accent sur le lecteur (le mettre en premier visuellement)
+  if (isMobile) {
+    const player = document.getElementById('link-player');
+    const editor = document.getElementById('link-editor');
+    player.style.borderColor = 'var(--accent)';
+  } else {
+    const editor = document.getElementById('link-editor');
+    editor.style.borderColor = 'var(--accent)';
+  }
+})();
+</script>
+</body>
+</html>
