@@ -151,12 +151,16 @@
     align-items: flex-start;
     justify-content: center;
     padding-top: 8px;
-    transition: opacity 0.3s, filter 0.3s;
+    transition: opacity 0.3s, filter 0.3s, height 0.25s ease, background 0.25s ease;
     margin-right: 1px;
     text-shadow: 0 1px 2px rgba(0,0,0,0.25);
   }
   .timeline-bar.past { opacity: 0.35; }
   .timeline-bar.current { filter: brightness(1.1) saturate(1.2); }
+  .timeline-bar.overridden {
+    outline: 2px dashed var(--warning);
+    outline-offset: -3px;
+  }
   .timeline-cursor {
     position: absolute;
     top: 0; bottom: 0;
@@ -767,6 +771,15 @@
     }
     const info = Blocks.blockAtTime(state.workout, elapsedSec);
     if (info && info.index !== state.currentBlockIdx) {
+      // Restaurer le style original de l'ancien bloc (si override y était appliqué)
+      const prevIdx = state.currentBlockIdx;
+      if (prevIdx >= 0) {
+        const prevBar = document.querySelector('.timeline-bar[data-index="' + prevIdx + '"]');
+        const prevBlock = state.workout.blocks[prevIdx];
+        if (prevBar && prevBlock) {
+          styleBar(prevBar, prevBlock.level, prevBlock.level, prevBlock.duration);
+        }
+      }
       state.currentBlockIdx = info.index;
       state.overrideLevel = null;
       if (state.bleConnected) {
@@ -813,7 +826,28 @@
       const idx = parseInt(bar.dataset.index, 10);
       bar.classList.toggle('past', idx < (info ? info.index : w.blocks.length));
       bar.classList.toggle('current', info && idx === info.index);
+      // Restyle la barre courante en fonction de l'override actif
+      if (info && idx === info.index) {
+        const eff = state.overrideLevel !== null ? state.overrideLevel : info.block.level;
+        styleBar(bar, eff, info.block.level, info.block.duration);
+      }
     });
+  }
+
+  /** Applique hauteur, couleur et label d'une barre selon un niveau effectif. */
+  function styleBar(bar, effectiveLevel, plannedLevel, durationSec) {
+    const heightPct = 8 + (effectiveLevel / 15) * 92;
+    bar.style.height = heightPct + '%';
+    const hue = 220 - (effectiveLevel - 1) * 14;
+    bar.style.background = 'hsl(' + hue + ', 70%, 55%)';
+    if (durationSec >= 20) bar.textContent = effectiveLevel;
+    else bar.textContent = '';
+    // Marqueur visuel "override" si le niveau effectif diffère du prévu
+    if (effectiveLevel !== plannedLevel) {
+      bar.classList.add('overridden');
+    } else {
+      bar.classList.remove('overridden');
+    }
   }
 
   function renderTimeline() {
@@ -827,12 +861,7 @@
       bar.className = 'timeline-bar';
       bar.dataset.index = i;
       bar.style.width = ((b.duration / total) * 100) + '%';
-      // Hauteur proportionnelle : niveau 1 = 8% (visible), niveau 15 = 100%
-      const heightPct = 8 + (b.level / 15) * 92;
-      bar.style.height = heightPct + '%';
-      const hue = 220 - (b.level - 1) * 14;
-      bar.style.background = 'hsl(' + hue + ', 70%, 55%)';
-      if (b.duration >= 20) bar.textContent = b.level;
+      styleBar(bar, b.level, b.level, b.duration);
       tl.insertBefore(bar, cursor);
     });
   }
