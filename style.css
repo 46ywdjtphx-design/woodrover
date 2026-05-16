@@ -1,29 +1,34 @@
 /* ============================================================
-   Rameur Woodrover · style partagé
+   Rameur Woodrover · thème clair
    ============================================================ */
 
 :root {
-  --bg: #0f1115;
-  --surface: #1a1d24;
-  --surface-2: #232730;
-  --surface-3: #2d323d;
-  --text: #e8eaed;
-  --text-dim: #9aa0a6;
-  --text-muted: #5f6368;
-  --accent: #4f8cff;
-  --accent-dim: #1e3a6f;
-  --success: #34d399;
-  --success-dim: #064e3b;
-  --danger: #f87171;
-  --danger-dim: #7f1d1d;
-  --warning: #fbbf24;
-  --warning-dim: #78350f;
-  --purple: #c084fc;
-  --purple-dim: #4c1d95;
-  --border: #2a2e38;
+  --bg: #f5f6f8;
+  --surface: #ffffff;
+  --surface-2: #eef0f3;
+  --surface-3: #e3e6eb;
+  --text: #1a1d24;
+  --text-dim: #5f6368;
+  --text-muted: #9aa0a6;
+  --accent: #2563eb;
+  --accent-dim: #dbe7fb;
+  --accent-hover: #1d4ed8;
+  --success: #059669;
+  --success-dim: #d1fae5;
+  --danger: #dc2626;
+  --danger-dim: #fee2e2;
+  --warning: #d97706;
+  --warning-dim: #fef3c7;
+  --purple: #7c3aed;
+  --purple-dim: #ede9fe;
+  --border: #d6d9df;
+  --border-soft: #e8eaee;
   --radius: 10px;
   --radius-sm: 6px;
-  --shadow: 0 2px 8px rgba(0,0,0,0.3);
+  --shadow: 0 1px 3px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.04);
+  --shadow-md: 0 4px 12px rgba(0,0,0,0.08);
+  /* Police "horloge digitale" pour les chiffres : monospace tabulaire */
+  --font-digital: ui-monospace, "SF Mono", "Menlo", "Roboto Mono", monospace;
 }
 
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
@@ -45,12 +50,12 @@ button {
   color: var(--text);
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  padding: 12px 16px;
+  padding: 10px 16px;
   font-size: 14px;
   font-weight: 500;
   font-family: inherit;
   cursor: pointer;
-  transition: background 0.15s, transform 0.05s, border-color 0.15s;
+  transition: background 0.15s, transform 0.05s, border-color 0.15s, box-shadow 0.15s;
   -webkit-touch-callout: none;
   user-select: none;
   display: inline-flex;
@@ -58,22 +63,25 @@ button {
   justify-content: center;
   gap: 6px;
 }
-button:active:not(:disabled) { transform: scale(0.97); background: var(--surface-2); }
-button:hover:not(:disabled) { border-color: var(--text-muted); }
+button:hover:not(:disabled) { background: var(--surface-2); border-color: var(--text-muted); }
+button:active:not(:disabled) { transform: scale(0.97); background: var(--surface-3); }
 button:disabled { opacity: 0.4; cursor: not-allowed; }
 
 button.primary { background: var(--accent); border-color: var(--accent); color: white; }
-button.primary:hover:not(:disabled) { background: #3b75db; border-color: #3b75db; }
+button.primary:hover:not(:disabled) { background: var(--accent-hover); border-color: var(--accent-hover); }
 button.success { background: var(--success-dim); border-color: var(--success); color: var(--success); }
+button.success:hover:not(:disabled) { background: var(--success); color: white; }
 button.danger  { background: var(--danger-dim); border-color: var(--danger); color: var(--danger); }
+button.danger:hover:not(:disabled)  { background: var(--danger); color: white; }
 button.warning { background: var(--warning-dim); border-color: var(--warning); color: var(--warning); }
-button.ghost   { background: transparent; }
-button.small   { font-size: 12px; padding: 8px 10px; }
+button.ghost   { background: transparent; border-color: transparent; }
+button.ghost:hover:not(:disabled) { background: var(--surface-2); border-color: var(--border); }
+button.small   { font-size: 12px; padding: 7px 10px; }
 button.icon    { padding: 8px; width: 36px; height: 36px; }
 
 input[type="text"],
 input[type="number"] {
-  background: var(--bg);
+  background: var(--surface);
   color: var(--text);
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
@@ -81,10 +89,12 @@ input[type="number"] {
   font-family: inherit;
   font-size: 14px;
   outline: none;
+  transition: border-color 0.15s;
 }
 input[type="text"]:focus,
 input[type="number"]:focus {
   border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-dim);
 }
 
 a { color: var(--accent); text-decoration: none; }
@@ -98,19 +108,19 @@ a:hover { text-decoration: underline; }
   pointer-events: none;
 }
 .toast {
-  background: var(--surface-2);
+  background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius);
   padding: 10px 16px;
   margin-bottom: 8px;
   font-size: 14px;
-  box-shadow: var(--shadow);
+  box-shadow: var(--shadow-md);
   animation: toast-in 0.2s ease;
   pointer-events: auto;
 }
-.toast.success { border-color: var(--success); color: var(--success); }
-.toast.danger { border-color: var(--danger); color: var(--danger); }
-.toast.warning { border-color: var(--warning); color: var(--warning); }
+.toast.success { border-color: var(--success); background: var(--success-dim); color: var(--success); }
+.toast.danger  { border-color: var(--danger);  background: var(--danger-dim);  color: var(--danger); }
+.toast.warning { border-color: var(--warning); background: var(--warning-dim); color: var(--warning); }
 @keyframes toast-in {
   from { opacity: 0; transform: translateY(-10px); }
   to { opacity: 1; transform: translateY(0); }
@@ -118,7 +128,7 @@ a:hover { text-decoration: underline; }
 
 .modal-backdrop {
   position: fixed; inset: 0;
-  background: rgba(0,0,0,0.7);
+  background: rgba(20,25,40,0.45);
   z-index: 9000;
   display: flex; align-items: center; justify-content: center;
   padding: 20px;
@@ -130,8 +140,15 @@ a:hover { text-decoration: underline; }
   padding: 24px;
   max-width: 480px;
   width: 100%;
-  box-shadow: var(--shadow);
+  box-shadow: var(--shadow-md);
 }
 .modal h2 { margin: 0 0 12px; font-size: 18px; }
 .modal p { margin: 0 0 16px; color: var(--text-dim); font-size: 14px; line-height: 1.5; }
 .modal .modal-actions { display: flex; gap: 8px; justify-content: flex-end; }
+
+/* Classe utilitaire chiffres "horloge digitale" */
+.digital {
+  font-family: var(--font-digital);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+}

@@ -14,16 +14,17 @@
     max-height: 100vh;
     overflow: hidden;
   }
-  /* Sidebar gauche : liste des workouts */
+  /* ===== Sidebar gauche ===== */
   .sidebar {
     background: var(--surface);
     border-right: 1px solid var(--border);
     overflow-y: auto;
     display: flex; flex-direction: column;
+    box-shadow: 1px 0 4px rgba(0,0,0,0.03);
   }
   .sidebar-header {
     padding: 16px;
-    border-bottom: 1px solid var(--border);
+    border-bottom: 1px solid var(--border-soft);
     display: flex; flex-direction: column; gap: 8px;
     position: sticky; top: 0;
     background: var(--surface);
@@ -47,6 +48,7 @@
     margin-bottom: 4px;
     cursor: pointer;
     border: 1px solid transparent;
+    transition: background 0.1s;
   }
   .workout-item:hover { background: var(--surface-2); }
   .workout-item.active {
@@ -72,7 +74,7 @@
     font-size: 13px;
   }
 
-  /* Main : édition du workout sélectionné */
+  /* ===== Main ===== */
   .main {
     overflow-y: auto;
     padding: 24px 32px;
@@ -81,7 +83,7 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    margin-bottom: 24px;
+    margin-bottom: 20px;
     gap: 16px;
     flex-wrap: wrap;
   }
@@ -96,9 +98,13 @@
     border-bottom: 1px dashed transparent;
     padding: 4px 0;
     flex: 1;
+    color: var(--text);
   }
   .editor-title input:hover { border-bottom-color: var(--border); }
-  .editor-title input:focus { border-bottom-color: var(--accent); }
+  .editor-title input:focus {
+    border-bottom-color: var(--accent);
+    box-shadow: none;
+  }
 
   .editor-stats {
     display: flex; gap: 24px;
@@ -106,71 +112,79 @@
     border: 1px solid var(--border);
     border-radius: var(--radius);
     padding: 12px 20px;
+    box-shadow: var(--shadow);
   }
   .stat-item { display: flex; flex-direction: column; }
-  .stat-item .stat-lbl { font-size: 11px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.04em; }
-  .stat-item .stat-val { font-size: 18px; font-weight: 600; font-variant-numeric: tabular-nums; }
+  .stat-item .stat-lbl {
+    font-size: 11px; color: var(--text-dim);
+    text-transform: uppercase; letter-spacing: 0.04em;
+  }
+  .stat-item .stat-val {
+    font-size: 18px; font-weight: 600;
+    font-variant-numeric: tabular-nums;
+  }
 
-  /* Graph */
+  /* ===== Graph (plus grand qu'avant) ===== */
   .graph-container {
     background: var(--surface);
     border: 1px solid var(--border);
     border-radius: var(--radius);
-    padding: 16px;
+    padding: 16px 20px;
     margin-bottom: 24px;
+    box-shadow: var(--shadow);
   }
   .graph {
     position: relative;
-    height: 200px;
+    height: 280px;
     border-bottom: 1px solid var(--border);
     border-left: 1px solid var(--border);
     margin: 12px 0 4px;
     display: flex;
     align-items: flex-end;
+    background: linear-gradient(to top, var(--surface-2) 0%, var(--surface) 100%);
   }
   .graph-empty {
     width: 100%;
     text-align: center;
     color: var(--text-muted);
     font-size: 13px;
-    padding: 60px 0;
+    padding: 100px 0;
   }
   .graph-bar {
     position: relative;
     margin-right: 1px;
-    background: var(--accent);
     color: white;
     font-size: 11px;
     font-weight: 600;
-    transition: background 0.15s;
+    transition: filter 0.15s;
     display: flex;
     align-items: flex-start;
     justify-content: center;
     padding-top: 4px;
     cursor: pointer;
   }
-  .graph-bar:hover { filter: brightness(1.15); }
-  .graph-bar.dragging { opacity: 0.4; }
-  .graph-bar.drag-over { box-shadow: inset 4px 0 0 var(--warning); }
+  .graph-bar:hover { filter: brightness(1.1); }
   .graph-axis-label {
     font-size: 10px;
     color: var(--text-dim);
     margin-top: 4px;
   }
 
-  /* Blocks list */
+  /* ===== Blocks list ===== */
   .blocks-section {
     background: var(--surface);
     border: 1px solid var(--border);
     border-radius: var(--radius);
-    padding: 16px;
+    padding: 16px 20px;
+    box-shadow: var(--shadow);
   }
   .blocks-section h2 {
     margin: 0 0 12px;
-    font-size: 14px;
+    font-size: 13px;
     text-transform: uppercase;
     letter-spacing: 0.06em;
     color: var(--text-dim);
+    font-weight: 600;
   }
   .blocks-header {
     display: grid;
@@ -193,8 +207,9 @@
     border-radius: var(--radius-sm);
     margin-bottom: 4px;
     transition: background 0.15s, opacity 0.15s;
+    border: 1px solid transparent;
   }
-  .block-row:hover { background: var(--surface-3); }
+  .block-row:hover { background: var(--surface-3); border-color: var(--border-soft); }
   .block-row.dragging { opacity: 0.4; }
   .block-row.drag-over { box-shadow: 0 -2px 0 var(--accent); }
   .block-handle {
@@ -205,11 +220,6 @@
     user-select: none;
   }
   .block-handle:active { cursor: grabbing; }
-  .block-index {
-    font-size: 12px;
-    color: var(--text-dim);
-    width: 24px;
-  }
   .block-input {
     width: 100%;
   }
@@ -217,7 +227,7 @@
     display: flex; align-items: center; gap: 4px;
   }
   .level-control input { flex: 1; text-align: center; }
-  .level-control button { padding: 4px 8px; font-size: 14px; }
+  .level-control button { padding: 4px 8px; font-size: 14px; min-width: 28px; }
 
   .blocks-empty {
     padding: 24px;
@@ -242,16 +252,12 @@
   }
   .no-workout-selected .big-emoji { font-size: 56px; margin-bottom: 16px; }
 
-  /* Mobile : layout vertical, sidebar repliable */
   @media (max-width: 800px) {
     .app { grid-template-columns: 1fr; height: auto; }
-    .sidebar {
-      max-height: 50vh;
-      border-right: none;
-      border-bottom: 1px solid var(--border);
-    }
+    .sidebar { max-height: 50vh; border-right: none; border-bottom: 1px solid var(--border); }
     .main { padding: 16px; }
     .editor-stats { width: 100%; justify-content: space-around; }
+    .graph { height: 200px; }
   }
 </style>
 </head>
@@ -291,9 +297,6 @@
   let currentId = null;
   let currentWorkout = null;
 
-  // ============================================================
-  // RENDER SIDEBAR
-  // ============================================================
   function renderSidebar() {
     const list = document.getElementById('sidebar-list');
     const workouts = Storage.getAll();
@@ -317,9 +320,6 @@
     });
   }
 
-  // ============================================================
-  // SELECT & RENDER MAIN
-  // ============================================================
   function selectWorkout(id) {
     currentId = id;
     currentWorkout = Storage.get(id);
@@ -373,9 +373,9 @@
 
       <div class="graph-container">
         <div id="graph" class="graph"></div>
-        <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--text-dim);">
+        <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--text-dim);margin-top:4px;">
           <span>0:00</span>
-          <span>${Utils.fmtTime(total)}</span>
+          <span class="digital">${Utils.fmtTime(total)}</span>
         </div>
       </div>
 
@@ -397,7 +397,6 @@
       </div>
     `;
 
-    // Title input
     const titleInput = document.getElementById('title-input');
     titleInput.value = w.name;
     titleInput.addEventListener('change', function() {
@@ -405,12 +404,10 @@
       persist();
     });
 
-    // Stats
     document.getElementById('stat-blocks').textContent = w.blocks.length;
     document.getElementById('stat-duration').textContent = Utils.fmtTime(total);
     document.getElementById('stat-avg').textContent = w.blocks.length === 0 ? '—' : (Math.round(avgLevel * 10) / 10);
 
-    // Boutons header
     document.getElementById('btn-duplicate').addEventListener('click', function(){
       const copy = Storage.duplicate(w.id);
       if (copy) { Toast.success('Entraînement dupliqué'); selectWorkout(copy.id); }
@@ -424,7 +421,6 @@
       }
     });
 
-    // Boutons ajout rapide
     document.getElementById('btn-add-block').addEventListener('click', function() {
       w.blocks.push(Blocks.create(60, 5));
       persist(); renderMain();
@@ -445,9 +441,6 @@
     renderBlocks();
   }
 
-  // ============================================================
-  // RENDER GRAPH (barres style Kinomap)
-  // ============================================================
   function renderGraph() {
     const graph = document.getElementById('graph');
     const w = currentWorkout;
@@ -462,16 +455,14 @@
       bar.className = 'graph-bar';
       bar.dataset.index = i;
       bar.style.width = ((b.duration / total) * 100) + '%';
-      // Hauteur proportionnelle au niveau (1→7%, 15→100%)
       const heightPct = 5 + (b.level / 15) * 95;
       bar.style.height = heightPct + '%';
-      // Couleur selon niveau : bleu (faible) → orange/rouge (fort)
-      const hue = 220 - (b.level - 1) * 14; // 220→14
-      bar.style.background = 'hsl(' + hue + ', 65%, 55%)';
+      // Palette adaptée fond clair : bleu doux → orange/rouge intense
+      const hue = 220 - (b.level - 1) * 14;
+      bar.style.background = 'hsl(' + hue + ', 70%, 55%)';
       bar.title = 'Bloc ' + (i+1) + ' · ' + Utils.fmtTime(b.duration) + ' · niveau ' + b.level;
       if (b.duration >= 30) bar.textContent = b.level;
       bar.addEventListener('click', function() {
-        // Scroll vers le bloc dans la liste
         const row = document.querySelector('.block-row[data-index="' + i + '"]');
         if (row) {
           row.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -484,9 +475,6 @@
     });
   }
 
-  // ============================================================
-  // RENDER BLOCKS LIST
-  // ============================================================
   function renderBlocks() {
     const list = document.getElementById('blocks-list');
     const w = currentWorkout;
@@ -510,10 +498,9 @@
           <input type="number" class="block-input block-level" min="1" max="15" value="${b.level}">
           <button class="small" data-act="inc">+</button>
         </div>
-        <span style="font-size:12px;color:var(--text-dim);">${Utils.fmtTime(cumul)}</span>
+        <span style="font-size:12px;color:var(--text-dim);" class="digital">${Utils.fmtTime(cumul)}</span>
         <button class="small danger icon" title="Supprimer">×</button>
       `;
-      // Duration input
       const durInput = row.querySelector('.block-duration');
       durInput.addEventListener('change', function() {
         const sec = Utils.parseTime(durInput.value);
@@ -521,7 +508,6 @@
         persist();
         renderMain();
       });
-      // Level input + buttons
       const lvlInput = row.querySelector('.block-level');
       lvlInput.addEventListener('change', function() {
         const v = parseInt(lvlInput.value, 10) || 1;
@@ -537,13 +523,11 @@
         b.level = Math.min(BLE.MAX_LEVEL, b.level + 1);
         persist(); renderMain();
       });
-      // Delete
       row.querySelector('.danger.icon').addEventListener('click', function() {
         w.blocks.splice(i, 1);
         persist(); renderMain();
       });
 
-      // Drag & drop
       row.addEventListener('dragstart', function(e) {
         e.dataTransfer.effectAllowed = 'move';
         e.dataTransfer.setData('text/plain', String(i));
@@ -581,9 +565,6 @@
     return m + ':' + String(s).padStart(2, '0');
   }
 
-  // ============================================================
-  // SIDEBAR ACTIONS
-  // ============================================================
   document.getElementById('btn-new').addEventListener('click', function() {
     const name = prompt('Nom du nouvel entraînement :', 'Nouvel entraînement');
     if (name === null) return;
@@ -595,7 +576,6 @@
   document.getElementById('btn-import').addEventListener('click', function() {
     document.getElementById('import-file').click();
   });
-
   document.getElementById('import-file').addEventListener('change', function(e) {
     const file = e.target.files && e.target.files[0];
     if (!file) return;
@@ -610,9 +590,8 @@
       }
     };
     reader.readAsText(file);
-    e.target.value = ''; // reset pour permettre ré-import du même fichier
+    e.target.value = '';
   });
-
   document.getElementById('btn-export').addEventListener('click', function() {
     const data = Storage.exportJson();
     const blob = new Blob([data], { type: 'application/json' });
@@ -626,15 +605,9 @@
     Toast.success('Export téléchargé');
   });
 
-  // ============================================================
-  // INIT
-  // ============================================================
   renderSidebar();
-  // Auto-sélectionne le premier workout s'il y en a, ou crée un exemple
   const all = Storage.getAll();
-  if (all.length > 0) {
-    selectWorkout(all[0].id);
-  }
+  if (all.length > 0) selectWorkout(all[0].id);
 })();
 </script>
 </body>
