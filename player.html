@@ -252,7 +252,7 @@
   /* === Métriques bas avec "temps restant bloc" en gros === */
   .player-bottom {
     display: grid;
-    grid-template-columns: 1.6fr repeat(4, 1fr);
+    grid-template-columns: 1.4fr 1.4fr repeat(4, 1fr);
     gap: 8px;
     padding: 10px 16px 12px;
     flex-shrink: 0;
@@ -294,6 +294,13 @@
     font-weight: 700;
     letter-spacing: -1px;
   }
+  /* Variante "neutre" pour le temps total restant : bien lisible mais sans tirer l'œil */
+  .metric-cell.big.neutral {
+    background: var(--surface-2);
+    border-color: var(--border);
+  }
+  .metric-cell.big.neutral .m-lbl { color: var(--text-dim); }
+  .metric-cell.big.neutral .m-val { color: var(--text); }
 
   /* Overlay de fin */
   .overlay-finished {
@@ -337,7 +344,8 @@
     .player-bottom {
       grid-template-columns: 1fr 1fr;
     }
-    .metric-cell.big { grid-column: 1 / -1; }
+    /* En portrait : les 2 cellules big partagent la 1ère ligne, le reste s'empile en dessous */
+    .metric-cell.big { grid-column: auto; }
     .player-top .block-label { font-size: 12px; }
   }
 
@@ -444,6 +452,10 @@
     <div class="metric-cell big">
       <div class="m-lbl">Temps restant bloc</div>
       <div class="m-val digital" id="block-remaining">0:00</div>
+    </div>
+    <div class="metric-cell big neutral">
+      <div class="m-lbl">Total restant</div>
+      <div class="m-val digital" id="total-remaining">0:00</div>
     </div>
     <div class="metric-cell">
       <div class="m-lbl">Puissance</div>
@@ -641,6 +653,7 @@
     const totalSec = Blocks.totalDuration(workout);
     document.getElementById('t-total').textContent = Utils.fmtTime(totalSec);
     document.getElementById('t-total-bottom').textContent = Utils.fmtTime(totalSec);
+    document.getElementById('total-remaining').textContent = Utils.fmtTime(totalSec);
 
     setTransportState('idle');
     renderTimeline();
@@ -801,6 +814,7 @@
     const elapsedSec = state.elapsedMs / 1000;
 
     document.getElementById('t-elapsed').textContent = Utils.fmtTime(elapsedSec);
+    document.getElementById('total-remaining').textContent = Utils.fmtTime(Math.max(0, total - elapsedSec));
 
     const info = Blocks.blockAtTime(w, elapsedSec);
     if (info) {
