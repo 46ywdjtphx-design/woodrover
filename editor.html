@@ -271,7 +271,9 @@
         <button class="primary small" id="btn-new">+ Nouveau</button>
         <button class="small" id="btn-import">Importer</button>
         <button class="small" id="btn-export">Exporter</button>
+        <button class="small" id="btn-sync" title="Sync GitHub">☁ Sync</button>
       </div>
+      <div id="sync-status" style="font-size:11px; color:var(--text-dim); margin-top:4px;"></div>
     </div>
     <div class="sidebar-list" id="sidebar-list">
       <div class="empty-state">Aucun entraînement.<br>Crée-en un avec « + Nouveau ».</div>
@@ -287,6 +289,20 @@
 </div>
 
 <input type="file" id="import-file" accept=".json,application/json" style="display:none">
+
+<!-- Modal de sync -->
+<div class="modal-backdrop" id="sync-modal" style="display:none">
+  <div class="modal">
+    <h2>☁ Synchronisation</h2>
+    <div id="sync-modal-body"></div>
+  </div>
+</div>
+
+<!-- Bandeau de mode lecture seule -->
+<div id="viewer-banner" style="display:none; position:fixed; top:0; left:0; right:0; background:var(--warning); color:white; padding:10px 16px; text-align:center; z-index:500; font-size:13px; font-weight:500; box-shadow:var(--shadow);">
+  📖 Mode lecture seule (depuis un Gist partagé) — l'édition est désactivée.
+  <button class="small ghost" id="btn-exit-viewer" style="margin-left:12px; background:rgba(255,255,255,0.2); color:white; border-color:transparent;">Quitter ce mode</button>
+</div>
 
 <script src="app.js"></script>
 <script>
@@ -604,6 +620,293 @@
     setTimeout(function(){ URL.revokeObjectURL(url); }, 1000);
     Toast.success('Export téléchargé');
   });
+
+  // ============================================================
+  // SYNC : config + push/pull
+  // ============================================================
+  const { Sync } = RameurApp;
+  let lastSyncTs = 0;
+  let pushDebounceTimer = null;
+
+  function updateSyncStatus() {
+    const status = document.getElementById('sync-status');
+    const info = Sync.getInfo();
+    if (info.mode === 'local') {
+      status.innerHTML = 'Local · <a href="#" id="sync-link-config" style="color:var(--accent);">Configurer la sync</a>';
+      document.getElementById('viewer-banner').style.display = 'none';
+      enableEditing(true);
+    } else if (info.mode === 'owner') {
+      const since = lastSyncTs ? ' · sync ' + new Date(lastSyncTs).toLocaleTimeString('fr-FR', { hour:'2-digit', minute:'2-digit' }) : '';
+      status.innerHTML = '☁ Sync activée' + since;
+      document.getElementById('viewer-banner').style.display = 'none';
+      enableEditing(true);
+    } else if (info.mode === 'viewer') {
+      status.innerHTML = '📖 Lecture seule';
+      document.getElementById('viewer-banner').style.display = 'block';
+      enableEditing(false);
+    }
+    const linkConfig = document.getElementById('sync-link-config');
+    if (linkConfig) {
+      linkConfig.addEventListener('click', function(e){ e.preventDefault(); openSyncModal(); });
+    }
+  }
+
+  function enableEditing(enabled) {
+    const btnNew = document.getElementById('btn-new');
+    const btnImport = document.getElementById('btn-import');
+    if (btnNew) btnNew.disabled = !enabled;
+    if (btnImport) btnImport.disabled = !enabled;
+    document.querySelectorAll('#main input, #main button').forEach(function(el) {
+      el.disabled = !enabled;
+    });
+  }
+
+  function openSyncModal() {
+    const modal = document.getElementById('sync-modal');
+    const body = document.getElementById('sync-modal-body');
+    const mode = Sync.getMode();
+    if (mode === 'local') {
+      body.innerHTML = `
+        <p>Choisis comment synchroniser tes entraînements entre tes appareils.</p>
+        <div style="display:flex; flex-direction:column; gap:12px; margin-bottom:16px;">
+          <button class="primary" id="sync-setup-owner">🔑 Configurer mon compte GitHub (édition)</button>
+          <button id="sync-setup-viewer">📖 Utiliser un lien partagé (lecture seule)</button>
+        </div>
+        <div class="modal-actions">
+          <button id="sync-cancel">Fermer</button>
+        </div>
+      `;
+      modal.style.display = 'flex';
+      document.getElementById('sync-cancel').onclick = closeSyncModal;
+      document.getElementById('sync-setup-owner').onclick = showOwnerSetup;
+      document.getElementById('sync-setup-viewer').onclick = showViewerSetup;
+    } else if (mode === 'owner') {
+      showOwnerInfo();
+    } else if (mode === 'viewer') {
+      showViewerInfo();
+    }
+  }
+
+  function closeSyncModal() {
+    document.getElementById('sync-modal').style.display = 'none';
+  }
+
+  function showOwnerSetup() {
+    const body = document.getElementById('sync-modal-body');
+    body.innerHTML = `
+      <p>Crée un token GitHub avec la permission <b>Gists: read &amp; write</b> :</p>
+      <ol style="font-size:13px; color:var(--text-dim); line-height:1.7; padding-left:20px;">
+        <li>Va sur <a href="https://github.com/settings/personal-access-tokens" target="_blank">github.com/settings/personal-access-tokens</a></li>
+        <li>Clique <b>"Generate new token"</b> → Fine-grained</li>
+        <li>Repository access : aucun (suffit)</li>
+        <li>Account permissions → <b>Gists : Read and write</b></li>
+        <li>Copie le token et colle-le ci-dessous</li>
+      </ol>
+      <input type="text" id="token-input" placeholder="github_pat_..." style="width:100%; margin-bottom:8px;">
+      <p style="font-size:12px; color:var(--text-dim);">Le token est stocké uniquement dans ton navigateur et envoyé uniquement à GitHub.</p>
+      <div class="modal-actions">
+        <button id="back-btn">← Retour</button>
+        <button class="primary" id="confirm-btn">Activer la sync</button>
+      </div>
+    `;
+    document.getElementById('back-btn').onclick = openSyncModal;
+    document.getElementById('confirm-btn').onclick = async function() {
+      const token = document.getElementById('token-input').value.trim();
+      if (!token) { Toast.error('Token manquant'); return; }
+      const btn = document.getElementById('confirm-btn');
+      btn.disabled = true;
+      btn.textContent = 'Connexion...';
+      try {
+        const result = await Sync.setupOwner(token);
+        Toast.success('Sync activée pour ' + result.username);
+        lastSyncTs = Date.now();
+        updateSyncStatus();
+        renderSidebar();
+        showOwnerInfo();
+      } catch (e) {
+        Toast.error(e.message);
+        btn.disabled = false;
+        btn.textContent = 'Activer la sync';
+      }
+    };
+  }
+
+  function showOwnerInfo() {
+    const info = Sync.getInfo();
+    const body = document.getElementById('sync-modal-body');
+    const shareUrl = info.shareUrl || '(non disponible)';
+    body.innerHTML = `
+      <p style="color:var(--success);">✓ Sync activée (mode édition)</p>
+      <p style="font-size:13px;">Tes entraînements sont sauvegardés sur ton Gist privé. Toute modification est poussée automatiquement.</p>
+      <div style="background:var(--surface-2); border:1px solid var(--border); border-radius:6px; padding:10px; margin:12px 0;">
+        <div style="font-size:11px; color:var(--text-dim); text-transform:uppercase; letter-spacing:0.05em; margin-bottom:4px;">Lien à partager (lecture seule)</div>
+        <input type="text" id="share-url" readonly value="${shareUrl}" style="width:100%; font-size:11px;">
+        <button class="small" id="copy-share" style="margin-top:6px;">📋 Copier</button>
+      </div>
+      <p style="font-size:12px; color:var(--text-dim);">Donne ce lien à ta femme (message, mail, AirDrop). Quand elle l'ouvrira, son app sera configurée en lecture seule sur tes entraînements.</p>
+      <div class="modal-actions">
+        <button id="resync-btn">🔄 Re-pull</button>
+        <button class="danger" id="disconnect-btn">Désactiver</button>
+        <button class="primary" id="close-btn">OK</button>
+      </div>
+    `;
+    document.getElementById('sync-modal').style.display = 'flex';
+    document.getElementById('close-btn').onclick = closeSyncModal;
+    document.getElementById('copy-share').onclick = function() {
+      const input = document.getElementById('share-url');
+      input.select();
+      navigator.clipboard.writeText(input.value).then(function() {
+        Toast.success('Lien copié');
+      });
+    };
+    document.getElementById('resync-btn').onclick = async function() {
+      try {
+        await Sync.pull();
+        lastSyncTs = Date.now();
+        Toast.success('Synchronisé depuis GitHub');
+        renderSidebar(); renderMain();
+        updateSyncStatus();
+      } catch (e) { Toast.error(e.message); }
+    };
+    document.getElementById('disconnect-btn').onclick = function() {
+      if (!confirm('Désactiver la sync ? Le Gist distant n\'est PAS supprimé, juste déconnecté de ce navigateur.')) return;
+      Sync.disconnect();
+      Toast.success('Sync désactivée');
+      closeSyncModal();
+      updateSyncStatus();
+    };
+  }
+
+  function showViewerSetup() {
+    const body = document.getElementById('sync-modal-body');
+    body.innerHTML = `
+      <p>Colle l'URL du Gist qu'on t'a partagée (ou un lien complet) :</p>
+      <input type="text" id="url-input" placeholder="https://gist.githubusercontent.com/..." style="width:100%; margin-bottom:8px;">
+      <p style="font-size:12px; color:var(--text-dim);">En mode lecture seule, tu pourras consulter les entraînements partagés mais pas les modifier ni en créer.</p>
+      <div class="modal-actions">
+        <button id="back-btn">← Retour</button>
+        <button class="primary" id="confirm-btn">Charger</button>
+      </div>
+    `;
+    document.getElementById('back-btn').onclick = openSyncModal;
+    document.getElementById('confirm-btn').onclick = async function() {
+      let url = document.getElementById('url-input').value.trim();
+      if (!url) { Toast.error('URL manquante'); return; }
+      try {
+        const u = new URL(url);
+        const g = u.searchParams.get('gist');
+        if (g) url = g;
+      } catch(e) {}
+      const btn = document.getElementById('confirm-btn');
+      btn.disabled = true;
+      btn.textContent = 'Chargement...';
+      try {
+        const result = await Sync.setupViewer(url);
+        Toast.success(result.count + ' entraînement(s) chargé(s)');
+        lastSyncTs = Date.now();
+        closeSyncModal();
+        updateSyncStatus();
+        currentId = null; currentWorkout = null;
+        renderSidebar();
+        const all = Storage.getAll();
+        if (all.length > 0) selectWorkout(all[0].id);
+      } catch (e) {
+        Toast.error(e.message);
+        btn.disabled = false;
+        btn.textContent = 'Charger';
+      }
+    };
+  }
+
+  function showViewerInfo() {
+    const info = Sync.getInfo();
+    const body = document.getElementById('sync-modal-body');
+    body.innerHTML = `
+      <p>📖 Mode lecture seule</p>
+      <p style="font-size:13px;">Tu consultes la bibliothèque partagée. Tu ne peux pas modifier les entraînements.</p>
+      <div style="background:var(--surface-2); border:1px solid var(--border); border-radius:6px; padding:10px; margin:12px 0;">
+        <div style="font-size:11px; color:var(--text-dim); text-transform:uppercase; letter-spacing:0.05em; margin-bottom:4px;">Source</div>
+        <div style="font-size:11px; word-break:break-all;">${info.gistRawUrl}</div>
+      </div>
+      <div class="modal-actions">
+        <button id="resync-btn">🔄 Resynchroniser</button>
+        <button class="danger" id="disconnect-btn">Quitter ce mode</button>
+        <button class="primary" id="close-btn">OK</button>
+      </div>
+    `;
+    document.getElementById('sync-modal').style.display = 'flex';
+    document.getElementById('close-btn').onclick = closeSyncModal;
+    document.getElementById('resync-btn').onclick = async function() {
+      try {
+        await Sync.pull();
+        lastSyncTs = Date.now();
+        Toast.success('Resynchronisé');
+        renderSidebar(); renderMain();
+        updateSyncStatus();
+      } catch (e) { Toast.error(e.message); }
+    };
+    document.getElementById('disconnect-btn').onclick = function() {
+      if (!confirm('Quitter le mode lecture seule ? Les entraînements partagés seront retirés de cet appareil.')) return;
+      // En quittant viewer, on vide aussi le localStorage des workouts (puisqu'on ne les "possède" pas)
+      Sync.disconnect();
+      localStorage.removeItem('rameur_woodrover_v1');
+      Toast.success('Mode local restauré');
+      closeSyncModal();
+      updateSyncStatus();
+      currentId = null; currentWorkout = null;
+      renderSidebar(); renderMain();
+    };
+  }
+
+  document.getElementById('btn-sync').addEventListener('click', openSyncModal);
+  document.getElementById('btn-exit-viewer').addEventListener('click', function() {
+    if (!confirm('Quitter le mode lecture seule ?')) return;
+    Sync.disconnect();
+    localStorage.removeItem('rameur_woodrover_v1');
+    currentId = null; currentWorkout = null;
+    updateSyncStatus();
+    renderSidebar(); renderMain();
+  });
+
+  // Wrappe persist() pour déclencher un push automatique en mode owner
+  const _origPersist = persist;
+  persist = function() {
+    _origPersist.apply(this, arguments);
+    if (Sync.getMode() === 'owner') {
+      if (pushDebounceTimer) clearTimeout(pushDebounceTimer);
+      pushDebounceTimer = setTimeout(async function() {
+        try {
+          await Sync.push();
+          lastSyncTs = Date.now();
+          updateSyncStatus();
+        } catch (e) {
+          Toast.error('Push échoué : ' + e.message);
+        }
+      }, 3000);
+    }
+  };
+
+  // Au démarrage : si ?gist=... dans l'URL, configure auto le mode viewer
+  (async function() {
+    const result = await Sync.detectUrlConfig();
+    if (result) {
+      Toast.success('Mode lecture activé : ' + result.count + ' entraînement(s) chargé(s)');
+    }
+    updateSyncStatus();
+    if (Sync.getMode() === 'owner') {
+      try {
+        await Sync.pull();
+        lastSyncTs = Date.now();
+        renderSidebar();
+        updateSyncStatus();
+      } catch (e) {
+        console.warn('Pull initial échoué', e);
+      }
+    }
+    renderSidebar();
+    const all = Storage.getAll();
+    if (all.length > 0 && !currentId) selectWorkout(all[0].id);
+  })();
 
   renderSidebar();
   const all = Storage.getAll();

@@ -536,6 +536,235 @@
   };
 
   // ============================================================
+  // SYNC : sauvegarde et récupération via GitHub Gist
+  // ============================================================
+  /**
+   * Trois modes selon la config :
+   * - 'local'    : pas de sync, juste localStorage (par défaut)
+   * - 'owner'    : token GitHub configuré → lecture + écriture du Gist
+   * - 'viewer'   : URL Gist configurée mais pas de token → lecture seule
+   *
+   * Config stockée séparément en localStorage :
+   * - rameur_sync_token  : token GitHub (mode owner)
+   * - rameur_sync_gistid : ID du Gist (mode owner)
+   * - rameur_sync_url    : URL raw du Gist (mode viewer)
+   */
+  const SYNC_TOKEN_KEY = 'rameur_sync_token';
+  const SYNC_GISTID_KEY = 'rameur_sync_gistid';
+  const SYNC_URL_KEY = 'rameur_sync_url';
+  const SYNC_FILENAME = 'rameur-workouts.json';
+
+  const Sync = {
+    /** Retourne le mode actuel : 'local' | 'owner' | 'viewer' */
+    getMode: function() {
+      const token = localStorage.getItem(SYNC_TOKEN_KEY);
+      const gistId = localStorage.getItem(SYNC_GISTID_KEY);
+      const url = localStorage.getItem(SYNC_URL_KEY);
+      if (token && gistId) return 'owner';
+      if (url) return 'viewer';
+      return 'local';
+    },
+
+    /** Infos pour affichage UI */
+    getInfo: function() {
+      const mode = this.getMode();
+      const info = { mode: mode };
+      if (mode === 'owner') {
+        info.gistId = localStorage.getItem(SYNC_GISTID_KEY);
+        info.gistUrl = 'https://gist.github.com/' + info.gistId;
+        info.shareUrl = this._buildShareUrl();
+      } else if (mode === 'viewer') {
+        info.gistRawUrl = localStorage.getItem(SYNC_URL_KEY);
+      }
+      return info;
+    },
+
+    /** Construit l'URL de partage à donner à un viewer (mode owner uniquement) */
+    _buildShareUrl: function() {
+      const gistId = localStorage.getItem(SYNC_GISTID_KEY);
+      const token = localStorage.getItem(SYNC_TOKEN_KEY);
+      if (!gistId || !token) return null;
+      // On a besoin du nom d'utilisateur GitHub pour construire l'URL raw
+      // On le stocke aussi
+      const username = localStorage.getItem('rameur_sync_username') || '';
+      if (!username) return null;
+      const appBase = window.location.origin + window.location.pathname.replace(/[^/]*$/, '');
+      const rawUrl = 'https://gist.githubusercontent.com/' + username + '/' + gistId + '/raw/' + SYNC_FILENAME;
+      return appBase + '?gist=' + encodeURIComponent(rawUrl);
+    },
+
+    /** Active le mode owner : valide le token, trouve/crée le Gist, fait premier push */
+    setupOwner: async function(token) {
+      if (!token || !token.startsWith('github_pat_') && !token.startsWith('ghp_')) {
+        throw new Error('Token GitHub invalide (doit commencer par github_pat_ ou ghp_)');
+      }
+      // Test du token : récupère l'username
+      const userResp = await fetch('https://api.github.com/user', {
+        headers: { 'Authorization': 'Bearer ' + token, 'Accept': 'application/vnd.github+json' },
+      });
+      if (!userResp.ok) {
+        throw new Error('Token invalide ou sans permission (HTTP ' + userResp.status + ')');
+      }
+      const user = await userResp.json();
+      localStorage.setItem('rameur_sync_username', user.login);
+
+      // Cherche un Gist existant avec notre filename
+      const gistsResp = await fetch('https://api.github.com/gists', {
+        headers: { 'Authorization': 'Bearer ' + token, 'Accept': 'application/vnd.github+json' },
+      });
+      if (!gistsResp.ok) throw new Error('Impossible de lister les Gists');
+      const gists = await gistsResp.json();
+      let gist = gists.find(function(g) {
+        return g.files && g.files[SYNC_FILENAME];
+      });
+
+      if (!gist) {
+        // Crée un nouveau Gist privé avec le contenu local
+        const localData = Storage.exportJson();
+        const createResp = await fetch('https://api.github.com/gists', {
+          method: 'POST',
+          headers: {
+            'Authorization': 'Bearer ' + token,
+            'Accept': 'application/vnd.github+json',
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            description: 'Rameur Woodrover - workouts',
+            public: false,
+            files: {
+              [SYNC_FILENAME]: { content: localData },
+            },
+          }),
+        });
+        if (!createResp.ok) {
+          const t = await createResp.text();
+          throw new Error('Création Gist échouée : ' + t);
+        }
+        gist = await createResp.json();
+      }
+
+      localStorage.setItem(SYNC_TOKEN_KEY, token);
+      localStorage.setItem(SYNC_GISTID_KEY, gist.id);
+      // Supprime l'éventuelle config viewer (incompatible)
+      localStorage.removeItem(SYNC_URL_KEY);
+
+      return { username: user.login, gistId: gist.id, shareUrl: this._buildShareUrl() };
+    },
+
+    /** Active le mode viewer : valide l'URL en faisant un fetch, charge les données */
+    setupViewer: async function(rawUrl) {
+      if (!rawUrl) throw new Error('URL manquante');
+      // Test du fetch
+      const resp = await fetch(rawUrl, { cache: 'no-cache' });
+      if (!resp.ok) throw new Error('URL inaccessible (HTTP ' + resp.status + ')');
+      const text = await resp.text();
+      let parsed;
+      try { parsed = JSON.parse(text); }
+      catch(e) { throw new Error('Le contenu distant n\'est pas un JSON valide'); }
+      if (!parsed.workouts || !Array.isArray(parsed.workouts)) {
+        throw new Error('Format invalide : champ "workouts" manquant');
+      }
+      // OK : remplace tout en local et enregistre l'URL
+      localStorage.setItem(SYNC_URL_KEY, rawUrl);
+      // Supprime l'éventuelle config owner
+      localStorage.removeItem(SYNC_TOKEN_KEY);
+      localStorage.removeItem(SYNC_GISTID_KEY);
+      localStorage.removeItem('rameur_sync_username');
+      // Importe les workouts (replace)
+      Storage.importJson(text, 'replace');
+      return { count: parsed.workouts.length };
+    },
+
+    /** Pull : récupère la version distante et remplace la locale */
+    pull: async function() {
+      const mode = this.getMode();
+      if (mode === 'local') throw new Error('Sync non configurée');
+      let rawUrl;
+      let headers = {};
+      if (mode === 'owner') {
+        const token = localStorage.getItem(SYNC_TOKEN_KEY);
+        const gistId = localStorage.getItem(SYNC_GISTID_KEY);
+        // Récupère via API (renvoie le contenu du fichier)
+        const resp = await fetch('https://api.github.com/gists/' + gistId, {
+          headers: { 'Authorization': 'Bearer ' + token, 'Accept': 'application/vnd.github+json' },
+          cache: 'no-cache',
+        });
+        if (!resp.ok) throw new Error('Pull échoué (HTTP ' + resp.status + ')');
+        const gist = await resp.json();
+        const file = gist.files && gist.files[SYNC_FILENAME];
+        if (!file) throw new Error('Fichier ' + SYNC_FILENAME + ' absent du Gist');
+        // Si file.truncated, fetch via raw_url
+        let content = file.content;
+        if (file.truncated) {
+          const rawResp = await fetch(file.raw_url, { cache: 'no-cache' });
+          content = await rawResp.text();
+        }
+        Storage.importJson(content, 'replace');
+        return { source: 'owner', gistId: gistId };
+      } else {
+        rawUrl = localStorage.getItem(SYNC_URL_KEY);
+        // Ajoute un cache-buster pour forcer le re-fetch
+        const url = rawUrl + (rawUrl.indexOf('?') >= 0 ? '&' : '?') + '_t=' + Date.now();
+        const resp = await fetch(url, { cache: 'no-cache' });
+        if (!resp.ok) throw new Error('Pull échoué (HTTP ' + resp.status + ')');
+        const text = await resp.text();
+        Storage.importJson(text, 'replace');
+        return { source: 'viewer' };
+      }
+    },
+
+    /** Push : envoie la version locale vers le Gist (mode owner uniquement) */
+    push: async function() {
+      const mode = this.getMode();
+      if (mode !== 'owner') throw new Error('Push réservé au mode owner');
+      const token = localStorage.getItem(SYNC_TOKEN_KEY);
+      const gistId = localStorage.getItem(SYNC_GISTID_KEY);
+      const localData = Storage.exportJson();
+      const resp = await fetch('https://api.github.com/gists/' + gistId, {
+        method: 'PATCH',
+        headers: {
+          'Authorization': 'Bearer ' + token,
+          'Accept': 'application/vnd.github+json',
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          files: { [SYNC_FILENAME]: { content: localData } },
+        }),
+      });
+      if (!resp.ok) {
+        const t = await resp.text();
+        throw new Error('Push échoué : ' + t);
+      }
+      return { ok: true };
+    },
+
+    /** Déconnecte : efface la config sync (ne touche pas le Gist distant) */
+    disconnect: function() {
+      localStorage.removeItem(SYNC_TOKEN_KEY);
+      localStorage.removeItem(SYNC_GISTID_KEY);
+      localStorage.removeItem(SYNC_URL_KEY);
+      localStorage.removeItem('rameur_sync_username');
+    },
+
+    /** Détecte un ?gist=... dans l'URL et configure auto le mode viewer */
+    detectUrlConfig: async function() {
+      const params = new URLSearchParams(window.location.search);
+      const gistParam = params.get('gist');
+      if (!gistParam) return null;
+      try {
+        const result = await this.setupViewer(gistParam);
+        // Retire le paramètre de l'URL pour ne pas re-déclencher au prochain reload
+        const cleanUrl = window.location.pathname + window.location.hash;
+        window.history.replaceState({}, '', cleanUrl);
+        return result;
+      } catch (e) {
+        console.error('Auto-setup viewer failed', e);
+        return null;
+      }
+    },
+  };
+
+  // ============================================================
   // EXPORT
   // ============================================================
   global.RameurApp = {
@@ -545,5 +774,6 @@
     Storage: Storage,
     Blocks: Blocks,
     RowerDriver: RowerDriver,
+    Sync: Sync,
   };
 })(window);
