@@ -5,6 +5,11 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Rameur">
+<meta name="theme-color" content="#2563eb">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
 <title>Lecteur · Rameur Woodrover</title>
 <link rel="stylesheet" href="style.css">
 <style>
@@ -530,6 +535,46 @@
   let sessionTimer = null;
 
   // ============================================================
+  // WAKE LOCK : empêche l'écran de s'éteindre pendant l'entraînement
+  // ============================================================
+  let wakeLockSentinel = null;
+  let wakeLockDesired = false; // vrai tant qu'on est dans la vue lecteur
+
+  async function acquireWakeLock() {
+    wakeLockDesired = true;
+    if (!('wakeLock' in navigator)) {
+      console.info('Wake Lock API non supportée sur ce navigateur');
+      return;
+    }
+    if (wakeLockSentinel) return; // déjà actif
+    try {
+      wakeLockSentinel = await navigator.wakeLock.request('screen');
+      wakeLockSentinel.addEventListener('release', function() {
+        wakeLockSentinel = null;
+      });
+    } catch (e) {
+      console.warn('Wake Lock refusé', e);
+      wakeLockSentinel = null;
+    }
+  }
+
+  function releaseWakeLock() {
+    wakeLockDesired = false;
+    if (wakeLockSentinel) {
+      try { wakeLockSentinel.release(); } catch(e) {}
+      wakeLockSentinel = null;
+    }
+  }
+
+  // iOS/Safari relâche le wake lock quand la page passe en arrière-plan.
+  // Quand elle revient au premier plan, on ré-acquiert automatiquement.
+  document.addEventListener('visibilitychange', function() {
+    if (document.visibilityState === 'visible' && wakeLockDesired && !wakeLockSentinel) {
+      acquireWakeLock();
+    }
+  });
+
+  // ============================================================
   // BLE LOG
   // ============================================================
   const bleLogEl = document.getElementById('ble-log');
@@ -657,6 +702,9 @@
     document.getElementById('list-view').style.display = 'none';
     const pv = document.getElementById('player-view');
     pv.classList.add('active');
+
+    // Empêche l'écran de s'éteindre pendant qu'on est dans le lecteur
+    acquireWakeLock();
 
     document.getElementById('overlay-finished').classList.add('hidden');
 
@@ -934,6 +982,7 @@
     state.workout = null;
     state.running = false;
     state.paused = false;
+    releaseWakeLock();
     document.getElementById('player-view').classList.remove('active');
     document.getElementById('list-view').style.display = '';
     document.getElementById('overlay-finished').classList.add('hidden');
